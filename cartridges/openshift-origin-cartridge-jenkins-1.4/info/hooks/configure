@@ -126,7 +126,7 @@ export JENKINS_USERNAME=system_builder
 export JENKINS_PASSWORD=$system_builder_password
 
 # Repo
-if [ ! -d "$git_url" ]; then
+if [ -n "$git_url" -a ! -d "$git_url" ]; then
 	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	create_repo $application $user_id $group_id $uuid

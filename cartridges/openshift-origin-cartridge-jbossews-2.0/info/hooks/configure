@@ -148,7 +148,7 @@ ln -s ${JBOSS_CARTRIDGE_ROOT}/info/bin/tomcat7 $APP_JBOSS_BIN_DIR/tomcat7
 popd > /dev/null
 
 # Repo
-if [ ! -d "$git_url" ]; then
+if [ -n "$git_url" -a ! -d "$git_url" ]; then
 	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	create_repo $application $user_id $group_id $uuid

@@ -34,7 +34,7 @@ disable_cgroups
 check_cartridge_dir_doesnt_exist
 
 # Repo
-if [ ! -d "$git_url" ]; then
+if [ -n "$git_url" -a ! -d "$git_url" ]; then
 	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	clone_git_repo $application $user_id $group_id $uuid "ruby 1.9"
