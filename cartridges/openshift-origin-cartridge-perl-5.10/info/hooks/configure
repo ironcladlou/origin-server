@@ -29,14 +29,14 @@ cartridge_type="perl-5.10"
 source "/etc/openshift/node.conf"
 source ${CARTRIDGE_BASE_PATH}/abstract/info/lib/util
 
-setup_configure "$1" $2 $3 $4
+setup_configure "$1" $2 $3 "$4"
 disable_cgroups
 
 check_cartridge_dir_doesnt_exist
 
 # Repo
-if [ ! -d $git_url ]; then
-	clone_external_git_repo $application $user_id $group_id $uuid $git_url
+if [ ! -d "$git_url" ]; then
+	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	clone_git_repo $application $user_id $group_id $uuid "perl 5.10"
 fi
@@ -86,7 +86,7 @@ create_standard_path_env_var
 
 observe_setup_env_uservars_dir
 
-if [ ! -d $git_url ]; then
+if [ ! -d "$git_url" ]; then
     #
     # Resolve app dependencies for template
     #

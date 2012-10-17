@@ -611,7 +611,7 @@ function setup_configure {
     application="$1"
     namespace=`basename $2`
     uuid=$3
-    git_url=$4
+    git_url="$4"
 
     setup_app_dir_vars
     setup_user_vars

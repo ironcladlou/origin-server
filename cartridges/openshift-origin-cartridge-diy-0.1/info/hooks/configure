@@ -29,14 +29,14 @@ cartridge_type="diy-0.1"
 source "/etc/openshift/node.conf"
 source ${CARTRIDGE_BASE_PATH}/abstract/info/lib/util
 
-setup_configure "$1" $2 $3 $4
+setup_configure "$1" $2 $3 "$4"
 disable_cgroups
 
 check_cartridge_dir_doesnt_exist
 
 # Repo
-if [ ! -d $git_url ]; then
-	clone_external_git_repo $application $user_id $group_id $uuid $git_url
+if [ ! -d "$git_url" ]; then
+	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	clone_git_repo $application $user_id $group_id $uuid "diy 0.1"
 fi
@@ -81,7 +81,7 @@ echo "export PATH=$CART_INFO_DIR/bin/:$CARTRIDGE_BASE_PATH/abstract/info/bin/:$P
 
 observe_setup_env_uservars_dir
 
-if [ ! -d $git_url ]; then
+if [ ! -d "$git_url" ]; then
     #
     # Resolve app dependencies for template
     #

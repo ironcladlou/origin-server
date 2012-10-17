@@ -28,14 +28,14 @@ cartridge_type="ruby-1.9"
 source "/etc/openshift/node.conf"
 source ${CARTRIDGE_BASE_PATH}/abstract/info/lib/util
 
-setup_configure "$1" $2 $3 $4
+setup_configure "$1" $2 $3 "$4"
 disable_cgroups
 
 check_cartridge_dir_doesnt_exist
 
 # Repo
-if [ ! -d $git_url ]; then
-	clone_external_git_repo $application $user_id $group_id $uuid $git_url
+if [ ! -d "$git_url" ]; then
+	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	clone_git_repo $application $user_id $group_id $uuid "ruby 1.9"
 fi
@@ -99,7 +99,7 @@ echo "export LD_LIBRARY_PATH=$ruby19_ld_libs" > $APP_HOME/.env/LD_LIBRARY_PATH
 ruby19_manpath=$(scl enable ruby193 "printenv MANPATH")
 echo "export MANPATH=$ruby19_manpath" > $APP_HOME/.env/MANPATH
 
-if [ ! -d $git_url ]; then
+if [ ! -d "$git_url" ]; then
     #
     # Resolve app dependencies for template
     #

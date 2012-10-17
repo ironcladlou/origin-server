@@ -82,7 +82,7 @@ done
 
 [ $# -eq 4 -o $# -eq 3 ] || print_help
 
-setup_configure "$1" $2 $3 $4
+setup_configure "$1" $2 $3 "$4"
 disable_cgroups
 check_cartridge_dir_doesnt_exist
 
@@ -126,8 +126,8 @@ export JENKINS_USERNAME=system_builder
 export JENKINS_PASSWORD=$system_builder_password
 
 # Repo
-if [ ! -d $git_url ]; then
-	clone_external_git_repo $application $user_id $group_id $uuid $git_url
+if [ ! -d "$git_url" ]; then
+	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	create_repo $application $user_id $group_id $uuid
 fi

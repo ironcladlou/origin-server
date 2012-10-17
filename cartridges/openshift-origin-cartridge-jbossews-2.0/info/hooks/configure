@@ -90,7 +90,7 @@ JBOSS_CARTRIDGE_ROOT=$CARTRIDGE_BASE_PATH/${jboss_version}
 cartridge_type="${jboss_version}"
 
 source ${CARTRIDGE_BASE_PATH}/abstract/info/lib/util
-setup_configure "$1" $2 $3 $4
+setup_configure "$1" $2 $3 "$4"
 
 disable_cgroups
 check_cartridge_dir_doesnt_exist
@@ -148,8 +148,8 @@ ln -s ${JBOSS_CARTRIDGE_ROOT}/info/bin/tomcat7 $APP_JBOSS_BIN_DIR/tomcat7
 popd > /dev/null
 
 # Repo
-if [ ! -d $git_url ]; then
-	clone_external_git_repo $application $user_id $group_id $uuid $git_url
+if [ ! -d "$git_url" ]; then
+	clone_external_git_repo $application $user_id $group_id $uuid "$git_url"
 else
 	create_repo $application $user_id $group_id $uuid
 fi
@@ -208,7 +208,7 @@ echo "export PATH=$JBOSS_CARTRIDGE_ROOT/info/bin/:$CARTRIDGE_BASE_PATH/abstract/
 
 observe_setup_env_uservars_dir
 
-if [ ! -d $git_url ]; then
+if [ ! -d "$git_url" ]; then
     #
     # Resolve app dependencies for template
     #
