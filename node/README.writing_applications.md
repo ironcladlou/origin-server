@@ -82,43 +82,24 @@ application developer an opportunity to integrate more closely with specific
 cartridges.
 
 The following is a list of all possible action hooks executed in association
-with a single cartridge control action. For each control action, a set of `pre`
-and `post` action hooks surround the control action. In the action hook names,
-`{Name}` refers to the `Name` cartridge manifest element.
+with a single cartridge control action. 
 
-- `start` control action:
-  - `pre_start`
-  - `pre_start_{Name}` <sup>[1](#action-hook-note)</sup>
-  - `post_start`
-  - `post_start_{Name}` <sup>[1](#action-hook-note)</sup>
-- `stop` control action: 
-  - `pre_stop`
-  - `pre_stop_{Name}` <sup>[1](#action-hook-note)</sup>
-  - `post_stop`
-  - `post_stop_{Name}` <sup>[1](#action-hook-note)</sup>
-- `reload` control action:
-  - `pre_reload`
-  - `pre_reload_{Name}` <sup>[1](#action-hook-note)</sup>
-  - `post_reload`
-  - `post_reload_{Name}` <sup>[1](#action-hook-note)</sup>
-- `restart` control action: 
-  - `pre_restart`
-  - `pre_restart_{Name}` <sup>[1](#action-hook-note)</sup>
-  - `post_restart`
-  - `post_restart_{Name}` <sup>[1](#action-hook-note)</sup>
-- `tidy` control action:
-  - `pre_tidy`
-  - `pre_tidy_{Name}` <sup>[1](#action-hook-note)</sup>
-  - `post_tidy`
-  - `post_tidy_{Name}`<sup>[1](#action-hook-note)</sup>
+- `start`
+- `stop`
+- `reload`
+- `restart`
+- `tidy`
+
+For each control action, a set of `pre` and `post` action hooks surround the control action. 
+Cartridges may specify their own hooks in their `.openshift/action_hooks` directory by appending their name, for example
+`post_start_ruby` or `pre_stop_python`.
+
+Each hook is assumed to be a shell script which is `sourced` in the same execution as the action it
+relates to; this facilitates the modification of the control action's environment (e.g. via `export` statements).
 
 For details about the control actions (including what they represent and when
 they are called), refer to the [control script documentation](README.writing_cartridges.md#bincontrol)
 in the [Writing Cartridges](README.writing_cartridges.md) guide.
-
-<a name="action-hook-note"/>
-<sup>1</sup> Hook is assumed to be a shell script which is `sourced` in the same execution as the action it
-relates to; this facilitates the modification of the control action's environment (e.g. via `export` statements).
 
 #### Build Action Hooks
 
