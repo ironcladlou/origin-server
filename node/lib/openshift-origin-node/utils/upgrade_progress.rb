@@ -31,7 +31,7 @@ module OpenShift
             begin
               yield(step[:context], step[:errors])
             rescue OpenShift::Runtime::Utils::ShellExecutionException => e
-              steps[:errors] << "Unhandled shell exception performing step: #{e.message}\nreturn code: #{e.rc}\nstdout: #{e.stdout}\nstderr: #{e.stderr}"
+              step[:errors] << "Unhandled shell exception performing step: #{e.message}\nreturn code: #{e.rc}\nstdout: #{e.stdout}\nstderr: #{e.stderr}"
               raise e
             rescue => e
               step[:errors] << "Unhandled exception performing step: #{e.message}\n#{e.backtrace.join("\n")}"

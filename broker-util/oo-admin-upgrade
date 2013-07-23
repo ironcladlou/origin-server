@@ -41,108 +41,103 @@ def upgrade_gear(login, app_name, gear_uuid, version, ignore_cartridge_version=f
       user = CloudUser.with(consistency: :eventual).find_by(login: login)
     rescue Mongoid::Errors::DocumentNotFound
     end
-    if user
-      app, gear = Application.find_by_gear_uuid(gear_uuid)
-      if app
-        if gear
-          server_identity = gear.server_identity
-          # gear.node_profile = app.node_profile if gear.node_profile.nil?
-          begin
-            Timeout::timeout(420) do
-              output = ''
-              exit_code = 1
-              upgrade = MIGRATION_CART_TYPES.nil? 
-              cartridges = gear.group_instance.all_component_instances.map { |ci| ci.cartridge_name }.uniq
-              MIGRATION_CART_TYPES.each do |cart_name|
-                if cartridges.include?(cart_name)
-                  upgrade = true
-                  break
-                end
-              end unless upgrade
 
-              json_data = nil
+    raise "User not found: #{login}" unless user
 
-              if upgrade
-                upgrade_on_node_start_time = (Time.now.to_f * 1000).to_i
-                out << "Upgrading on node...\n"
-                OpenShift::MCollectiveApplicationContainerProxy.rpc_exec('openshift', server_identity) do |client|
-                  client.upgrade(:uuid => gear_uuid,
-                                 :namespace => app.domain.namespace,
-                                 :version => version,
-                                 :ignore_cartridge_version => ignore_cartridge_version.to_s) do |response|
-                    exit_code = response[:body][:data][:exitcode]
-                    output = response[:body][:data][:output]
-                    json_data = response[:body][:data][:json_data]
-                  end
-                end
-                upgrade_on_node_time = (Time.now.to_f * 1000).to_i - upgrade_on_node_start_time
-                out << "***time_upgrade_on_node_measured_from_broker=#{upgrade_on_node_time}***\n"
-              end
+    app, gear = Application.find_by_gear_uuid(gear_uuid)
 
-              if json_data != nil
-                out << "Node JSON data:\n#{json_data}\n"
-              end
+    out << "WARNING: App not found: #{app_name}\n" unless app
+    out << "WARNING: Gear not found with uuid #{gear_uuid} for app '#{app_name}' and user '#{login}'\n" unless gear
+    
+    if app && gear
+      server_identity = gear.server_identity
 
-              if (output.length > 0)
-                out << "Upgrade on node output:\n #{output}\n"
-              end
-              if upgrade && exit_code != 0
-                out << "Upgrade on node exit code: #{exit_code}\n"
-                raise "Failed upgrading gear. Rerun with: #{upgrade_cmd}"
-              else
-                redeploy_httpd_proxy = REDEPLOY_HTTPD_PROXY_CART_TYPES.nil?
-
-                if REDEPLOY_HTTPD_PROXY_CART_TYPES
-                  gear_cartridges = cartridges
-                  REDEPLOY_HTTPD_PROXY_CART_TYPES.each do |cart_name|
-                    redeploy_httpd_proxy = gear_cartridges.include?(cart_name)
-                    break if redeploy_httpd_proxy
-                  end unless redeploy_httpd_proxy
-                end
-
-                # Should call oo-frontend-destroy and re-build the
-                # application, including idle state from scratch if
-                # need to purge possibly stale configuration.
-                # remove_httpd_proxy(gear, out) if recreate_httpd_proxy
-
-                redeploy_httpd_proxy_start_time = (Time.now.to_f * 1000).to_i
-                redeploy_httpd_proxy(gear, out) if redeploy_httpd_proxy
-                redeploy_httpd_proxy_time = (Time.now.to_f * 1000).to_i - redeploy_httpd_proxy_start_time
-                out << "***time_redeploy_httpd_proxy=#{redeploy_httpd_proxy_time}***\n"
-                redeploy_aliases(gear, out) if redeploy_httpd_proxy
-
-                restart_start_time = (Time.now.to_f * 1000).to_i
-                cartridges.each do |gear_cart|
-                  restart = RESTART_CART_TYPES.nil?
-                  RESTART_CART_TYPES.each do |cart_name|
-                    if gear_cart == cart_name
-                      restart = true
-                      break
-                    end
-                  end unless restart
-                  if restart
-                    component = gear.group_instance.all_component_instances.to_a.find { |ci| ci.cartridge_name==gear_cart }
-                    restart_component(gear, component, out)
-                  end
-                end
-                restart_time = (Time.now.to_f * 1000).to_i - restart_start_time
-                out << "***time_restart=#{restart_time}***\n"
-              end
-            end
-          rescue Timeout::Error
-            raise "Command '#{upgrade_cmd}' timed out"
+      Timeout::timeout(420) do
+        output = ''
+        exit_code = 1
+        upgrade = MIGRATION_CART_TYPES.nil? 
+        cartridges = gear.group_instance.all_component_instances.map { |ci| ci.cartridge_name }.uniq
+        MIGRATION_CART_TYPES.each do |cart_name|
+          if cartridges.include?(cart_name)
+            upgrade = true
+            break
           end
-          #gear.quarantined = false
-          #gear.save
-        else
-          out << "WARNING: Gear not found with uuid #{gear_uuid} for app '#{app_name}' and user '#{login}'\n"
+        end unless upgrade
+
+        json_data = nil
+
+        if upgrade
+          upgrade_on_node_start_time = (Time.now.to_f * 1000).to_i
+          out << "Upgrading on node...\n"
+          OpenShift::MCollectiveApplicationContainerProxy.rpc_exec('openshift', server_identity) do |client|
+            client.upgrade(:uuid => gear_uuid,
+                           :namespace => app.domain.namespace,
+                           :version => version,
+                           :ignore_cartridge_version => ignore_cartridge_version.to_s) do |response|
+              exit_code = response[:body][:data][:exitcode]
+              output = response[:body][:data][:output]
+              json_data = response[:body][:data][:json_data]
+            end
+          end
+          upgrade_on_node_time = (Time.now.to_f * 1000).to_i - upgrade_on_node_start_time
+          out << "***time_upgrade_on_node_measured_from_broker=#{upgrade_on_node_time}***\n"
         end
-      else
-        out << "WARNING: App not found: #{app_name}\n"
+
+        if json_data != nil
+          out << "Node JSON data: #{json_data}\n"
+        end
+
+        if (output.length > 0)
+          out << "Upgrade on node output:\n #{output}\n"
+        end
+
+        if upgrade && exit_code != 0
+          out << "Upgrade on node exit code: #{exit_code}\n"
+          raise "Failed upgrading gear. Rerun with: #{upgrade_cmd}"
+        end
+
+        redeploy_httpd_proxy = REDEPLOY_HTTPD_PROXY_CART_TYPES.nil?
+
+        if REDEPLOY_HTTPD_PROXY_CART_TYPES
+          gear_cartridges = cartridges
+          REDEPLOY_HTTPD_PROXY_CART_TYPES.each do |cart_name|
+            redeploy_httpd_proxy = gear_cartridges.include?(cart_name)
+            break if redeploy_httpd_proxy
+          end unless redeploy_httpd_proxy
+        end
+
+        # Should call oo-frontend-destroy and re-build the
+        # application, including idle state from scratch if
+        # need to purge possibly stale configuration.
+        # remove_httpd_proxy(gear, out) if recreate_httpd_proxy
+
+        redeploy_httpd_proxy_start_time = (Time.now.to_f * 1000).to_i
+        redeploy_httpd_proxy(gear, out) if redeploy_httpd_proxy
+        redeploy_httpd_proxy_time = (Time.now.to_f * 1000).to_i - redeploy_httpd_proxy_start_time
+        out << "***time_redeploy_httpd_proxy=#{redeploy_httpd_proxy_time}***\n"
+        redeploy_aliases(gear, out) if redeploy_httpd_proxy
+
+        restart_start_time = (Time.now.to_f * 1000).to_i
+        cartridges.each do |gear_cart|
+          restart = RESTART_CART_TYPES.nil?
+          RESTART_CART_TYPES.each do |cart_name|
+            if gear_cart == cart_name
+              restart = true
+              break
+            end
+          end unless restart
+          if restart
+            component = gear.group_instance.all_component_instances.to_a.find { |ci| ci.cartridge_name==gear_cart }
+            restart_component(gear, component, out)
+          end
+        end
+
+        restart_time = (Time.now.to_f * 1000).to_i - restart_start_time
+        out << "***time_restart=#{restart_time}***\n"
       end
-    else
-      raise "User not found: #{login}"
     end
+  rescue Timeout::Error
+    raise "Command '#{upgrade_cmd}' timed out\n#{e.backtrace}\nOutput:\n#{out.string}"
   rescue Exception => e
     raise "#{e.message}\n#{e.backtrace}\nOutput:\n#{out.string}"
   end

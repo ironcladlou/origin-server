@@ -188,7 +188,10 @@ module OpenShift
           :errors => errors
         }
 
-        [progress.report, exitcode, JSON.dump(data)]
+        # currently, higher level consumers of this output don't have access to the response structure
+        # in all cases, so package the JSON in the string output as well
+        output = "#{progress.report}\ngear_upgrade_json=#{JSON.dump(data)}\n"
+        [output, exitcode, JSON.dump(data)]
       end
 
       #
