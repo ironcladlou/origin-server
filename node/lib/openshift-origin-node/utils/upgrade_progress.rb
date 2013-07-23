@@ -16,19 +16,6 @@ module OpenShift
           @steps = {}
         end
 
-        def init_store
-          runtime_dir = File.join(gear_home, %w(app-root runtime))
-
-          if !File.exists?(runtime_dir)
-            log "Creating data directory #{runtime_dir} for #{@gear_home} because it does not exist"
-            FileUtils.mkpath(runtime_dir)
-            FileUtils.chmod_R(0o750, runtime_dir)
-            PathUtils.oo_chown_R(@uuid, @uuid, runtime_dir)
-            mcs_label = OpenShift::Runtime::Utils::SELinux::get_mcs_label(uuid)
-            OpenShift::Runtime::Utils::SELinux.set_mcs_label_R(mcs_label, runtime_dir)
-          end
-        end
-
         def step(name)
           unless @steps.has_key?(name)
             @steps[name] = {
