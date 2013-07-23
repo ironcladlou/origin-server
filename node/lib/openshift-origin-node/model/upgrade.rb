@@ -191,6 +191,9 @@ module OpenShift
         [progress.report, exitcode, JSON.dump(data)]
       end
 
+      #
+      # Initialize the metadata store for this gear, if it does not exist.
+      #
       def initialize_metadata_store
         runtime_dir = File.join(gear_home, %w(app-root runtime))
 
@@ -226,6 +229,9 @@ module OpenShift
         end
       end
 
+      #
+      # Compute the upgrade itinerary for the gear
+      #
       def compute_itinerary
         progress.step "compute_itinerary" do |context, errors|
           itinerary = UpgradeItinerary.new(gear_home)
@@ -288,11 +294,9 @@ module OpenShift
       #
       # Gear-level upgrade script:
       #
-      # 1. For each cartridge:
+      # 1. For each cartridge in the upgrade itinerary:
       #   1. Upgrade the cartridge to the new version
       #   2. Rebuild the cartridge ident, if applicable
-      # 2. If a cartridge is undergoing an incompatible upgrade, set an instruction to validate
-      #    the gear.
       #
       def upgrade_cartridges(itinerary)
         progress.log "Migrating gear at #{gear_home}"
@@ -471,7 +475,7 @@ module OpenShift
       def execute_cartridge_upgrade_script(cartridge_path, current_version, next_manifest)
         name = next_manifest.short_name.downcase
 
-        if !progress.has_instruction?("upgrade_script_#{name}")
+        progress.step "upgrade_script_#{name}" do |context, errors|
           upgrade_script = PathUtils.join(cartridge_path, %w(bin upgrade))
 
           if !File.exists?(upgrade_script)
@@ -484,14 +488,8 @@ module OpenShift
             return
           end
 
-          progress.set_instruction("upgrade_script_#{name}")
-        end
+          reload_gear_env
 
-        return if !progress.has_instruction?("upgrade_script_#{name}")
-
-        reload_gear_env
-
-        progress.step "upgrade_script_#{name}" do |context, errors|
           upgrade_script_cmd = "#{upgrade_script} #{next_manifest.version} #{current_version} #{next_manifest.cartridge_version}"
 
           out, err, rc = Utils::oo_spawn(upgrade_script_cmd,
