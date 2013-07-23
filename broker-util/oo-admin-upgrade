@@ -60,6 +60,8 @@ def upgrade_gear(login, app_name, gear_uuid, version, ignore_cartridge_version=f
                 end
               end unless upgrade
 
+              json_data = nil
+
               if upgrade
                 upgrade_on_node_start_time = (Time.now.to_f * 1000).to_i
                 out << "Upgrading on node...\n"
@@ -70,11 +72,17 @@ def upgrade_gear(login, app_name, gear_uuid, version, ignore_cartridge_version=f
                                  :ignore_cartridge_version => ignore_cartridge_version.to_s) do |response|
                     exit_code = response[:body][:data][:exitcode]
                     output = response[:body][:data][:output]
+                    json_data = response[:body][:data][:json_data]
                   end
                 end
                 upgrade_on_node_time = (Time.now.to_f * 1000).to_i - upgrade_on_node_start_time
                 out << "***time_upgrade_on_node_measured_from_broker=#{upgrade_on_node_time}***\n"
               end
+
+              if json_data != nil
+                out << "Node JSON data:\n#{json_data}\n"
+              end
+
               if (output.length > 0)
                 out << "Upgrade on node output:\n #{output}\n"
               end
