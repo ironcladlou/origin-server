@@ -56,15 +56,6 @@ module OpenShift
           @steps[marker][:status] = :complete
         end
 
-        def has_instruction?(instruction)
-          File.exists?(instruction_path(instruction))
-        end
-
-        def set_instruction(instruction)
-          FileUtils.touch(instruction_path(instruction))
-          log "Creating migration instruction #{instruction}"
-        end
-
         def done
           globs = %w(.upgrade_complete* .upgrade_instruction*)
 
