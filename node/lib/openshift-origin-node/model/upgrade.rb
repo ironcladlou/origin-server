@@ -112,7 +112,7 @@ module OpenShift
         restart_time = 0
         errors = []
 
-        progress.init_store
+        initialize_metadata_store
 
         if @@gear_extension_present
           begin
@@ -142,13 +142,14 @@ module OpenShift
 
           inspect_gear_state
           gear_pre_upgrade
-          restart_time = upgrade_cartridges
+          itinerary = compute_itinerary
+          restart_time = upgrade_cartridges(itinerary)
           gear_post_upgrade
 
-          if progress.has_instruction?('validate_gear')
+          if itinerary.has_incompatible_upgrade?
             validate_gear
 
-            if progress.complete? 'validate_gear'
+            progress.step 'validate_gear' do
               cleanup
             end
           else
@@ -190,6 +191,19 @@ module OpenShift
         [progress.report, exitcode, JSON.dump(data)]
       end
 
+      def initialize_metadata_store
+        runtime_dir = File.join(gear_home, %w(app-root runtime))
+
+        if !File.exists?(runtime_dir)
+          log "Creating runtime directory #{runtime_dir} for #{gear_home} because it does not exist"
+          FileUtils.mkpath(runtime_dir)
+          FileUtils.chmod_R(0o750, runtime_dir)
+          PathUtils.oo_chown_R(uuid, uuid, runtime_dir)
+          mcs_label = OpenShift::Runtime::Utils::SELinux::get_mcs_label(uuid)
+          OpenShift::Runtime::Utils::SELinux.set_mcs_label_R(mcs_label, runtime_dir)
+        end
+      end
+
       #
       # Execute the gear extension's 'pre_upgrade' method, if defined.
       #
@@ -212,6 +226,65 @@ module OpenShift
         end
       end
 
+      def compute_itinerary
+        progress.step "compute_itinerary" do |context, errors|
+          itinerary = UpgradeItinerary.new(gear_home)
+          cartridge_model      = OpenShift::Runtime::V2UpgradeCartridgeModel.new(config, container, state, OpenShift::Runtime::Utils::Hourglass.new(235))
+          cartridge_repository = OpenShift::Runtime::CartridgeRepository.instance
+
+          cartridge_model.each_cartridge do |manifest|
+            cartridge_path = File.join(gear_home, manifest.directory)
+
+            if !File.directory?(cartridge_path)
+              progress.log "Skipping upgrade for #{manifest.name}: cartridge manifest does not match gear layout: #{cartridge_path} is not a directory"
+              next
+            end
+
+            ident_path                               = Dir.glob(File.join(cartridge_path, 'env', 'OPENSHIFT_*_IDENT')).first
+            ident                                    = IO.read(ident_path)
+            vendor, name, version, cartridge_version = OpenShift::Runtime::Manifest.parse_ident(ident)
+
+            unless vendor == 'redhat'
+              progress.log "No upgrade available for cartridge #{ident}, #{vendor} not supported."
+              next
+            end
+
+            next_manifest = cartridge_repository.select(name, version)
+            unless next_manifest
+              progress.log "No upgrade available for cartridge #{ident}, cartridge not found in repository."
+              next
+            end
+
+            unless next_manifest.versions.include?(version)
+              progress.log "No upgrade available for cartridge #{ident}, version #{version} not in #{next_manifest.versions}"
+              next
+            end
+
+            if next_manifest.cartridge_version == cartridge_version
+              if ignore_cartridge_version
+                progress.log "Refreshing cartridge #{ident}, ignoring cartridge version."
+              else
+                progress.log "No upgrade required for cartridge #{ident}, already at latest version #{cartridge_version}."
+                next
+              end
+            end
+
+            upgrade_type = UpgradeType::INCOMPATIBLE
+
+            if next_manifest.compatible_versions.include?(cartridge_version)
+              upgrade_type = UpgradeType::COMPATIBLE
+            end
+
+            progress.log "Creating itinerary entry for #{upgrade_type.downcase} upgrade of #{ident}"
+            itinerary.create_entry(name, upgrade_type)
+          end
+
+          itinerary.persist
+        end
+
+        UpgradeItinerary.for_gear(uuid)
+      end
+
       #
       # Gear-level upgrade script:
       #
@@ -221,7 +294,7 @@ module OpenShift
       # 2. If a cartridge is undergoing an incompatible upgrade, set an instruction to validate
       #    the gear.
       #
-      def upgrade_cartridges
+      def upgrade_cartridges(itinerary)
         progress.log "Migrating gear at #{gear_home}"
 
         state                = OpenShift::Runtime::Utils::ApplicationState.new(container)
@@ -233,9 +306,14 @@ module OpenShift
         reset_quota, reset_block_quota, reset_inode_quota = relax_quota
 
         begin
+          if itinerary.has_incompatible_upgrade?
+            stop_gear
+          end
+
           OpenShift::Runtime::Utils::Cgroups.with_no_cpu_limits(uuid) do
             Dir.chdir(container.container_dir) do
-              cartridge_model.each_cartridge do |manifest|
+              itinerary.each_cartridge do |cartridge_name, upgrade_type|
+                manifest = cartridge_model.get_cartridge(cartridge_name)
                 cartridge_path = File.join(gear_home, manifest.directory)
 
                 if !File.directory?(cartridge_path)
@@ -247,43 +325,14 @@ module OpenShift
                 ident                                    = IO.read(ident_path)
                 vendor, name, version, cartridge_version = OpenShift::Runtime::Manifest.parse_ident(ident)
 
-                unless vendor == 'redhat'
-                  progress.log "No upgrade available for cartridge #{ident}, #{vendor} not supported."
-                  next
-                end
-
-                next_manifest = cartridge_repository.select(name, version)
-                unless next_manifest
-                  progress.log "No upgrade available for cartridge #{ident}, cartridge not found in repository."
-                  next
-                end
-
-                unless next_manifest.versions.include?(version)
-                  progress.log "No upgrade available for cartridge #{ident}, version #{version} not in #{next_manifest.versions}"
-                  next
-                end
-
-                if next_manifest.cartridge_version == cartridge_version
-                  if ignore_cartridge_version
-                    progress.log "Refreshing cartridge #{ident}, ignoring cartridge version."
-                  else
-                    progress.log "No upgrade required for cartridge #{ident}, already at latest version #{cartridge_version}."
-                    next
-                  end
-                end
-
                 progress.step "#{name}_upgrade" do |context, errors|
                   context[:cartridge] = name.downcase
 
-                  if next_manifest.compatible_versions.include?(cartridge_version)
+                  if upgrade_type == UpgradeType::COMPATIBLE
                     progress.log "Compatible upgrade of cartridge #{ident}"
                     context[:compatible] = true
                     compatible_upgrade(cartridge_model, cartridge_version, next_manifest, cartridge_path)
                   else
-                    progress.set_instruction('validate_gear')
-                    stop_gear unless progress.has_instruction?('restart_gear')
-                    progress.set_instruction('restart_gear')
-
                     progress.log "Incompatible upgrade of cartridge #{ident}"
                     context[:compatible] = false
                     incompatible_upgrade(cartridge_model, cartridge_version, next_manifest, version, cartridge_path)
@@ -302,7 +351,7 @@ module OpenShift
             end
           end
 
-          if progress.has_instruction?('restart_gear')
+          if itinerary.has_incompatible_upgrade?
             restart_start_time = timestamp
             start_gear
             restart_time = timestamp - restart_start_time
@@ -365,7 +414,6 @@ module OpenShift
       def compatible_upgrade(cart_model, current_version, next_manifest, target)
         OpenShift::Runtime::CartridgeRepository.overlay_cartridge(next_manifest, target)
 
-        # No ERB's are rendered for fast upgrades
         FileUtils.rm_f container.processed_templates(next_manifest)
         progress.log "Removed ERB templates for #{next_manifest.name}"
 

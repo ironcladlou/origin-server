@@ -1285,7 +1285,7 @@ The upgrade itinerary is computed as follows for each cartridge in a gear:
 
 ### Compatible Upgrades
 
-The compatible upgrade process for a cartridgjhon e is as follows:
+The compatible upgrade process for a cartridge is as follows:
 
 1.  The new version of the cartridge is overlaid in the gear.
 1.  The files declared in the `Processed-Templates` section of the cartridge's `managed-files.yml`
@@ -1303,7 +1303,7 @@ The compatible upgrade process for a cartridgjhon e is as follows:
 
 The incompatible upgrade process for a cartridge is as follows:
 
-1.  The files and directories declared int eh `Setup-Rewritten` section of the cartridge's 
+1.  The files and directories declared in the `Setup-Rewritten` section of the cartridge's 
     `managed_files.yml` are removed.
 1.  The new version of the cartridge is overlaid in the gear.
 1.  The cartridge directory is unlocked.
