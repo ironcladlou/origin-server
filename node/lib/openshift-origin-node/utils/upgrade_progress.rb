@@ -38,7 +38,11 @@ module OpenShift
               raise e
             end
 
-            mark_complete(name) if step[:errors].empty?
+            if not step[:errors].empty?
+              raise "Errors encountered executing step #{name}"
+            end
+
+            mark_complete(name)
           end
         end
 
