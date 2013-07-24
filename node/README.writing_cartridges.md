@@ -1252,7 +1252,7 @@ authors should take care to be as conservative as possible.
 
 ## OpenShift Upgrades
 
-The OpenShift runtime contains an upgrade system used to upgrade the cartridges in a gear to the latest available version and to apply gear-scoped changes which are orthogonal to cartridges to a gear.
+The OpenShift runtime contains an upgrade system used to upgrade the cartridges in a gear to the latest available version and to apply gear-scoped changes which are orthogonal to cartridges to a gear.  The `oo-admin-upgrade` command provides the CLI for the upgrade system and can be used to upgrade all gears in an OpenShift environment, all gears on a node, or a single gear.  This command queries the openshift broker to determine the locations of the indicated gears to migrate and makes mcollective calls to trigger the upgrade for a gear.
 
 During upgrades, OpenShift follows the following high-level process to upgrade a gear:
 
@@ -1292,11 +1292,7 @@ The compatible upgrade process for a cartridge is as follows:
     are removed.
 1.  The cartridge directory is unlocked.
 1.  The cartridge directory is secured.
-1.  If the cartridge provides an `upgrade` script, that script is executed and receives the
-    following parameters: (TODO: document upgrade script)
-  1.  The software version of the cartridge.
-  1.  The current cartridge version.
-  1.  The cartridge version being upgraded to.
+1.  If the cartridge provides an `upgrade` script, that script is executed.
 1.  The cartridge directory is locked.
 
 ### Incompatible Upgrades
@@ -1310,10 +1306,16 @@ The incompatible upgrade process for a cartridge is as follows:
 1.  The cartridge directory is secured.
 1.  The cartridge `setup` script is run.
 1.  The erb templates for the cartridge are processed.
-1.  If the cartridge provides an `upgrade` script, that script is executed and receives the
-    following parameters: (TODO: document upgrade script)
-  1.  The software version of the cartridge.
-  1.  The current cartridge version.
-  1.  The cartridge version being upgraded to.
+1.  If the cartridge provides an `upgrade` script, that script is executed.
 1.  The cartridge directory is locked.
 1.  The frontend is connected.
+
+### Cartridge Upgrade Script
+
+A cartridge may provide an `upgrade` script in the `bin` directory which will be executed during the upgrade process.  The purpose of this script is to allow for arbitrary actions to occur during the upgrade process which are not accounted for by the compatible or incompatible processes.  If the `upgrade` script is provided, it will be passed the following arguments:
+
+1.  The software version of the cartridge.
+1.  The current cartridge version.
+1.  The cartridge version being upgraded to.
+
+A non-zero exit code from this script will result in the upgrade operation failing until the exit code is corrected.
