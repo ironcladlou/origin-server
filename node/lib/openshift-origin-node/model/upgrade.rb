@@ -12,6 +12,7 @@ require 'openshift-origin-node/utils/cgroups'
 require 'openshift-origin-node/utils/application_state'
 require 'openshift-origin-node/utils/environ'
 require 'openshift-origin-node/utils/upgrade_progress'
+require 'openshift-origin-node/utils/upgrade_itinerary'
 require 'openshift-origin-common'
 require 'net/http'
 require 'uri'
@@ -155,9 +156,6 @@ module OpenShift
           else
             cleanup
           end
-
-          total_time = timestamp - start_time
-          progress.log "Total upgrade time on node (ms): #{total_time}"
         rescue OpenShift::Runtime::Utils::ShellExecutionException => e
           progress.log "Caught an exception during upgrade: #{e.message}", rc: e.rc, stdout: e.stdout, stderr: e.stderr
           errors << {
@@ -177,6 +175,9 @@ module OpenShift
           }
 
           exitcode = 1
+        ensure
+          total_time = timestamp - start_time
+          progress.log "Total upgrade time on node (ms): #{total_time}"
         end
 
         data = {
@@ -237,7 +238,8 @@ module OpenShift
       #
       def compute_itinerary
         progress.step "compute_itinerary" do |context, errors|
-          itinerary = UpgradeItinerary.new(gear_home)
+          itinerary            = OpenShift::Runtime::UpgradeItinerary.new(gear_home)
+          state                = OpenShift::Runtime::Utils::ApplicationState.new(container)
           cartridge_model      = OpenShift::Runtime::V2UpgradeCartridgeModel.new(config, container, state, OpenShift::Runtime::Utils::Hourglass.new(235))
           cartridge_repository = OpenShift::Runtime::CartridgeRepository.instance
 
@@ -291,7 +293,7 @@ module OpenShift
           itinerary.persist
         end
 
-        UpgradeItinerary.for_gear(uuid)
+        UpgradeItinerary.for_gear(gear_home)
       end
 
       #

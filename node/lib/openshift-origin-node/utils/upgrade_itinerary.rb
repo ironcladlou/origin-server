@@ -6,9 +6,9 @@ module OpenShift
     end
 
   	class UpgradeItinerary
-  	  def initialize(gear_home, entries = nil, has_incompatible = false)
+  	  def initialize(gear_home, entries = {}, has_incompatible = false)
   	  	@gear_home = gear_home
-        @entries = entries
+        @entries = entries || {}
         @has_incompatible = has_incompatible
   	  end
 
@@ -25,15 +25,14 @@ module OpenShift
       end
 
       def each_cartridge
-        entries.each_pair do |name, upgrade_type|
+        @entries.each_pair do |name, upgrade_type|
           yield name, upgrade_type if block_given?
         end
       end
 
       def persist
-        itinerary_file = itinerary_file(@gear_home)
       	jsonish_self = { entries: @entries, has_incompatible: @has_incompatible}
-        IO.write(itinerary_file, jsonish_self)
+        IO.write(self.class.itinerary_file(@gear_home), JSON.dump(jsonish_self))
       end
 
       def self.itinerary_file(gear_home)
@@ -41,8 +40,7 @@ module OpenShift
       end
 
       def self.for_gear(gear_home)
-      	itinerary_file = itinerary_file(gear_home)
-        serialized_self = IO.read(itinerary_file)
+        serialized_self = IO.read(itinerary_file(gear_home))
         jsonish_self = JSON.load(serialized_self)
         UpgradeItinerary.new(gear_home, jsonish_self[:entries], jsonish_self[:has_incompatible])
       end
