@@ -44,6 +44,10 @@ module OpenShift
         jsonish_self = JSON.load(serialized_self)
         UpgradeItinerary.new(gear_home, jsonish_self['entries'], jsonish_self['has_incompatible'])
       end
+
+      def self.remove_from(gear_home)
+        FileUtils.rm_f(itinerary_file(gear_home))
+      end
   	end
   end
 end
