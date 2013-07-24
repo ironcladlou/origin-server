@@ -42,7 +42,7 @@ module OpenShift
       def self.for_gear(gear_home)
         serialized_self = IO.read(itinerary_file(gear_home))
         jsonish_self = JSON.load(serialized_self)
-        UpgradeItinerary.new(gear_home, jsonish_self[:entries], jsonish_self[:has_incompatible])
+        UpgradeItinerary.new(gear_home, jsonish_self['entries'], jsonish_self['has_incompatible'])
       end
   	end
   end

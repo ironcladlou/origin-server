@@ -112,6 +112,7 @@ module OpenShift
         exitcode = 0
         restart_time = 0
         errors = []
+        upgrade_complete = false
 
         initialize_metadata_store
 
@@ -156,6 +157,8 @@ module OpenShift
           else
             cleanup
           end
+
+          upgrade_complete = true
         rescue OpenShift::Runtime::Utils::ShellExecutionException => e
           progress.log "Caught an exception during upgrade: #{e.message}", rc: e.rc, stdout: e.stdout, stderr: e.stderr
           errors << {
@@ -186,6 +189,7 @@ module OpenShift
           :total_time => total_time,
           :restart_time => restart_time,
           :steps => progress.steps,
+          :upgrade_complete => upgrade_complete,
           :errors => errors
         }
 
@@ -287,7 +291,7 @@ module OpenShift
             end
 
             progress.log "Creating itinerary entry for #{upgrade_type.downcase} upgrade of #{ident}"
-            itinerary.create_entry(name, upgrade_type)
+            itinerary.create_entry("#{name}-#{version}", upgrade_type)
           end
 
           itinerary.persist
