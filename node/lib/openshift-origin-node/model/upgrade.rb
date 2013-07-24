@@ -151,7 +151,7 @@ module OpenShift
           if itinerary.has_incompatible_upgrade?
             validate_gear
 
-            progress.step 'validate_gear' do
+            if progress.complete? 'validate_gear'
               cleanup
             end
           else
@@ -337,6 +337,7 @@ module OpenShift
                 ident_path                               = Dir.glob(File.join(cartridge_path, 'env', 'OPENSHIFT_*_IDENT')).first
                 ident                                    = IO.read(ident_path)
                 vendor, name, version, cartridge_version = OpenShift::Runtime::Manifest.parse_ident(ident)
+                next_manifest                            = cartridge_repository.select(name, version)
 
                 progress.step "#{name}_upgrade" do |context, errors|
                   context[:cartridge] = name.downcase
@@ -654,6 +655,7 @@ module OpenShift
         progress.log 'Cleaning up after upgrade'
         FileUtils.rm_f(File.join(gear_home, 'app-root', 'runtime', PREUPGRADE_STATE))
         progress.done
+        ::OpenShift::Runtime::UpgradeItinerary.remove_from(gear_home)
       end
     end
   end

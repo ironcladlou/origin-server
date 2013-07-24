@@ -61,7 +61,7 @@ module OpenShift
         end
 
         def done
-          globs = %w(.upgrade_complete* .upgrade_instruction*)
+          globs = %w(.upgrade_complete*)
 
           globs.each do |glob|
             Dir.glob(File.join(gear_home, 'app-root', 'runtime', glob)).each do |entry|
@@ -72,10 +72,6 @@ module OpenShift
 
         def marker_path(marker)
           File.join(gear_home, 'app-root', 'runtime', ".upgrade_complete_#{marker}")
-        end
-
-        def instruction_path(instruction)
-          File.join(gear_home, 'app-root', 'runtime', ".upgrade_instruction_#{instruction}")
         end
 
         def log(string, event_args = {})
