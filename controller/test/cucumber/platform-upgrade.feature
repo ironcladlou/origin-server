@@ -35,7 +35,7 @@ Feature: Cartridge upgrades
   Scenario: Upgrade a node using containing failed apps
     Given the expected version of the mock-0.1 cartridge is installed
     And a new client created mock-0.1 application named mock1
-    #And a new client created mock-0.2 application named mock2
+    And a new client created mock-0.2 application named mock2
     And the mock invocation markers are cleared in mock1
     #And the mock invocation markers are cleared in mock2
     And a rigged version of the mock-0.1 cartridge
