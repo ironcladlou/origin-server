@@ -325,7 +325,7 @@ When /^the gears on the node are upgraded with oo-admin-upgrade( --rerun)?$/ do 
   upgrade_cmd = "oo-admin-upgrade upgrade_node --version='expected'"
 
   if rerun
-    upgrade_cmd = "oo-admin-upgrade upgrade-node --version='expected' --mode=rerun"
+    upgrade_cmd = "oo-admin-upgrade upgrade-node --version='expected'"
   end
 
   output = `#{upgrade_cmd}`
