@@ -92,6 +92,7 @@ class Upgrader
 
     puts "Loading cluster itinerary from #{cluster_itinerary_path}"
     cluster_itinerary = JSON.parse(IO.read(cluster_itinerary_path))
+    cluster_itinerary_queue = JSON.parse(IO.read(cluster_itinerary_path))
 
     upgrade_result[:cluster_itinerary] = cluster_itinerary
     upgrade_result[:incomplete_cluster_itinerary] = []
@@ -108,7 +109,7 @@ class Upgrader
 
     node_threads = []
     mutex = Mutex.new
-    starting_nodes = cluster_itinerary.shift(max_threads)
+    starting_nodes = cluster_itinerary_queue.shift(max_threads)
     starting_nodes.each_with_index do |node, index|
       server_identity = node['server_identity']
       upgrade_result[:gear_counts][index] = node['gears_length']
@@ -119,17 +120,17 @@ class Upgrader
         upgrade_result[:incomplete_cluster_itinerary] << node if node_has_remaining_work?(server_identity)
 
         # get the next available node to process
-        while !cluster_itinerary.empty? do
+        while !cluster_itinerary_queue.empty? do
           server_identity = nil
           mutex.synchronize do
-            unless cluster_itinerary.empty?
-              node = cluster_itinerary.delete_at(0)
+            unless cluster_itinerary_queue.empty?
+              node = cluster_itinerary_queue.delete_at(0)
               server_identity = node['server_identity']
               upgrade_result[:gear_counts][index] += node['gears_length']
               upgrade_result[:gear_count] += node['gears_length']
               puts "#####################################################"
               puts "Remaining node queue:"
-              puts cluster_itinerary.pretty_inspect
+              puts cluster_itinerary_queue.pretty_inspect
               puts "#####################################################"
             end
           end
@@ -148,7 +149,7 @@ class Upgrader
     # rewrite the cluster itinerary if there are any remaining incomplete nodes
     FileUtils.rm_f cluster_itinerary_path if File.exists?(cluster_itinerary_path)
     puts "Writing updated cluster itinerary to #{cluster_itinerary_path}"
-    incomplete_itinerary = upgrade_result[:incomplete_cluster_itinerary] + cluster_itinerary
+    incomplete_itinerary = upgrade_result[:incomplete_cluster_itinerary] + cluster_itinerary_queue
     append_to_file(cluster_itinerary_path, JSON.dump(incomplete_itinerary))
 
     upgrade_result[:times]["total"] = (Time.now.to_f * 1000).to_i - start_time
@@ -574,19 +575,66 @@ class Upgrader
   end
 
   def build_text_summary(upgrade_result)
-    return "SUMMARY HERE"
-    node_queue.each do |node|
-      server_identity = node[:server_identity]
-      upgrade_itinerary = node_itinerary_path(server_identity)
-      leftover_count = `wc -l #{upgrade_itinerary}`.to_i
-      if leftover_count > 0
-        puts "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
-        puts "#{leftover_count} leftover gears found in upgrade itinerary: #{upgrade_itinerary}"
-        puts "You can run with --continue to try again"
-        puts "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
-        puts ""
+    buf = []
+
+    leftover_gears_per_node = {}
+    failed_gears_per_node = {}
+
+    upgrade_result[:cluster_itinerary].each do |node|
+      server_identity = node['server_identity']
+      node_itinerary = node_itinerary_path(server_identity)
+      rerun_itinerary = rerun_itinerary_path(server_identity)
+
+      if File.exists?(node_itinerary)
+        leftover_gears_per_node[server_identity] = `wc -l #{node_itinerary}`.to_i
+      end
+
+      if File.exists?(rerun_itinerary)
+        failed_gears_per_node[server_identity] = `wc -l #{rerun_itinerary}`.to_i
       end
     end
+
+    unless failed_gears_per_node.empty?
+      buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
+      buf << "Leftover gears found in node upgrade itineraries:"
+      failed_gears_per_node.each do |server_identity, count|
+        buf << "  #{server_identity}: #{count}"
+      end
+      buf << "You can run the upgrade again to continue"
+      buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
+    end
+
+    unless failed_gears_per_node.empty?
+      buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
+      buf << "Failed gears found in node rerun itineraries:"
+      failed_gears_per_node.each do |server_identity, count|
+        buf << "  #{server_identity}: #{count}"
+      end
+      buf << "You can run the upgrade again to rerun the failed gears"
+      buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
+    end 
+
+    failed_gears_total = failed_gears_per_node.values.inject{|sum,x| sum + x} || 0
+    upgrader_position_nodes = upgrade_result[:metadata]['upgrader_position_nodes']
+
+    buf << "#####################################################"
+    buf << "Summary:"
+    buf << "# of users: #{upgrade_result[:metadata]['logins_count']}"
+    buf << "# of gears: #{upgrade_result[:gear_count]}"
+    buf << "# of failures: #{failed_gears_total}"
+    buf << "Gear counts per thread: #{upgrade_result[:gear_counts].pretty_inspect}"
+    buf << "Nodes upgraded: #{upgrader_position_nodes.pretty_inspect}" if !upgrader_position_nodes.empty?
+    buf << "Timings:"
+    upgrade_result[:times].each do |topic, time_in_millis|
+      buf << "    #{topic}=#{time_in_millis.to_f/1000}s"
+    end
+    buf << "Additional timings:"
+    upgrade_result[:metadata]['times'].each do |topic, time_in_millis|
+      buf << "    #{topic}=#{time_in_millis.to_f/1000}s"
+    end
+    buf << "#####################################################"
+
+    buf.join("\n")
   end
 
   def log_file_path(server_identity)
