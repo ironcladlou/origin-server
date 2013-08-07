@@ -13,33 +13,62 @@ STDOUT.sync, STDERR.sync = true
 
 class Upgrader
   ##
-  # The main upgrade controller.
+  # The primary upgrade method. Executes cluster-wide upgrades using the following process:
   #
-  # 1. Build the node itinerary
-  # 2. Create workers to process each node via +upgrade_node+
-  # 3. Collect and report upon the results
+  # 1. Create or reuses an existing cluster itinerary representing the ordered list of
+  #    nodes in the cluster to upgrade, as well as high level metadata about the cluster.
+  #
+  #    Part of the cluster itinerary creation includes the creation of node itineraries
+  #    containing the gears on a node to upgrade.
+  #
+  # 2. Create worker threads to process each node in the cluster itinerary. These workers
+  #    process node itineraries to perform the actual gear upgrades. Results are written
+  #    to files on disk per node.
+  #
+  # 3. Recreate the cluster itinerary using the combination of incompletely or unprocessed nodes.
+  #
+  # 4. Generate reports based on all output and emit them to stdout.
+  #
+  # The upgrade process is meant to be re-entrant. If existing itineraries exist, processing
+  # will continue using them. Failed gear upgrades result in a rerun itinerary which will result
+  # in a continuation of just those previous failures.
+  #
+  # The upgrade is considered a success if there are no node itineraries or rerun itineraries
+  # corresponding to any nodes following the upgrade.
   #
   # Expects an argument hash:
   #
-  #  :version - the upgrade version
+  #  :version                  - The target upgrade version.
   #
-  #  :mode    - one of the following:
+  #  :ignore_cartridge_version - Passed through to gear level upgrades; if +true+, upgrades
+  #                              will be performed regardless of the source and target versions.
+  #                              Default is +false+.
   #
-  #             :normal   - All existing upgrade data is cleared, and a full upgrade
-  #                         is initiated.
+  #  :target_server_itentity   - If present, causes the cluster itinerary to contain only the
+  #                              specified node.
   #
-  #             :continue - All existing upgrade data is preserved and the upgrade
-  #                         proceeds using the existing itinerary.
+  #  :upgrade_position         - TODO: Default is +1+.
   #
-  #             :rerun    - Any existing itinerary is replaced with a new one containing
-  #                         only the errors from the previous run; the error results from
-  #                         the previous are archived, and will contain new errors resulting
-  #                         from the rerun.
+  #  :num_upgraders            - TODO: Default is +1+.
   #
-  #  :ignore_cartridge_version - ??
-  #  :target_server_itentity - only process the specified node regardless of the itinerary
-  #  :upgrade_position: ??
-  #  :num_upgraders: ??
+  #  :max_threads              - The maximum numbers of threads to use when processing nodes.
+  #                              Default is +12+.
+  #
+  # Returns an upgrade result hash containing information about this upgrade execution. An
+  # example:
+  #
+  #   {
+  #     times: {
+  #       'total': 100
+  #       'task': 200
+  #     },
+  #     gear_count: 0,
+  #     gear_counts: [],
+  #     cluster_itinerary: <decoded json>,
+  #     incomplete_cluster_itinerary: <decoded json>,
+  #     metadata: <decoded json>
+  #   }
+  #
   def upgrade(args={})
     defaults = {
       version: nil,
@@ -70,9 +99,7 @@ class Upgrader
 
     start_time = (Time.now.to_f * 1000).to_i
 
-    # build the itinerary, only writing them to disk if this is a normal
-    # mode run (for continue and reruns, we'll be working from existing
-    # itineraries at the gear level)
+    # only rebuild the cluster itinerary if none exists
     if not File.exists?(cluster_itinerary_path)
       puts "Building cluster itinerary and metadata"
       create_cluster_itinerary(target_server_identity: target_server_identity,
@@ -146,7 +173,7 @@ class Upgrader
       t.join
     end
 
-    # rewrite the cluster itinerary if there are any remaining incomplete nodes
+    # rewrite the cluster itinerary with any leftover work
     FileUtils.rm_f cluster_itinerary_path if File.exists?(cluster_itinerary_path)
     puts "Writing updated cluster itinerary to #{cluster_itinerary_path}"
     incomplete_itinerary = upgrade_result[:incomplete_cluster_itinerary] + cluster_itinerary_queue
@@ -154,25 +181,59 @@ class Upgrader
 
     upgrade_result[:times]["total"] = (Time.now.to_f * 1000).to_i - start_time
 
+    # print a report
     puts build_text_summary(upgrade_result)
+
+    upgrade_result
   end
 
+  ##
+  # Returns +true+ if the given node has any outstanding itineraries.
+  #
   def node_has_remaining_work?(server_identity)
     return File.exists?(node_itinerary_path(server_identity)) || File.exists?(rerun_itinerary_path(server_identity))
   end
 
-
   ##
-  # Finds all the nodes containing gears to be upgraded.
+  # Finds all the nodes containing gears to be upgraded, and writes:
   #
-  # During the course of the gear detection, writes the gears to
-  # be upgraded to a file (see +write_node_itinerary+ for details).
+  #   1. A cluster itinerary file containing the nodes (in order) to be upgraded
+  #   2. A cluster metadata file with various pieces of information related to
+  #      the construction of the itinerary (such as logins detected and timings)
   #
-  # If the +write_node_itineraries+ argument is +false+, the +write_node_itinerary+ call
-  # is skipped.
+  #   3. Node itineraries for each node containing gears to be upgraded.
   #
-  # Returns an itinerary hash containing node-level metadata for the upgrade (not including
-  # the actual gear details). The nodes are sorted by the number of active gears they contain.
+  # The cluster itinerary is JSON data in the following format, with one line per node:
+  #
+  #   {
+  #     "server_identity": <string>,
+  #     "version": <string>,
+  #     "ignore_cartridge_version": <bool>,
+  #     "active_gear_length": <int>,
+  #     "inactive_gear_length": <int>,
+  #     "gears_length": <int>
+  #   }
+  #
+  # The cluster metadata is JSON data in the following format (one entry in the file):
+  #
+  #   {
+  #     "logins_count": <int>,
+  #     "upgrader_position_nodes": [],
+  #     "times": {}
+  #   }
+  #
+  #
+  # Expects an argument hash with data to store along with each node itinerary entry
+  # used to drive the gear level upgrades. Each argument is typically just passed
+  # through from +upgrade+; see that method for details.
+  #
+  #  :version
+  #  :ignore_cartridge_version
+  #  :target_server_itentity
+  #  :upgrade_position
+  #  :num_upgraders
+  #  :max_threads
+  #
   def create_cluster_itinerary(opts)
     raise "Cluster itinerary file already exists at #{cluster_itinerary_path}" if File.exists?(cluster_itinerary_path)
 
@@ -327,7 +388,7 @@ class Upgrader
   # Writes a node itinerary to a file in a consolidated format containing
   # one line per gear, where each line holds the information for both
   # the node and the gear so that future processing can be done on a
-  # line basis and have access to all necessary context. The hash is
+  # line basis and have access to all necessary context. The data is a
   # JSON representation of the following hash:
   #
   #   { 
@@ -340,6 +401,7 @@ class Upgrader
   #     "login": <string>,
   #     "active": <bool>
   #   }
+  #
   def write_node_itinerary(node, gears)
     itinerary_file = node_itinerary_path(node[:server_identity])
     puts "Writing #{gears.length} gears for node #{node[:server_identity]} to file #{itinerary_file}"
@@ -406,20 +468,21 @@ class Upgrader
   end
 
   ##
-  # Process JSON entries written by +write_node_itinerary+ and upgrades each gear
+  # Processes JSON entries in for format written by +write_node_itinerary+ and upgrades each gear
   # from the file using +upgrade_gear+.
   #
-  # Upgrade results are written as JSON to +results_file+. Results
-  # containing errors are written as JSON to +error_file+.
+  # Successful upgrade results from +upgrade_gear+ are written as JSON to +results_file+.
   #
-  # When a result contains errors, the source itinerary entry is re-written to
-  # +rerun_itinerary_file+ to facilitate reruns of past errors.
+  # Results containing errors are written as JSON to +error_file+ only after two retries
+  # have been attempted. In addition, when a result contains errors, the source itinerary
+  # entry is re-written to +rerun_itinerary_file+ to facilitate reruns of past errors.
   #
   # Each time an result is written to disk, the source line from +file+ is deleted. When
   # all lines are processed, the input file is deleted.
   #
   # This method returns nothing; callers must inspect the result file contents for
   # upgrade details.
+  #
   def upgrade_node_from_itinerary(file)
     while true
       itinerary_str = File.open(file, &:gets)
@@ -491,11 +554,13 @@ class Upgrader
   ##
   # Performs a gear upgrade via an RPC call to MCollective on a remote node.
   #
-  # Returns a hash of result data, including the remote upgrade JSON containing
-  # the gear level upgrade details.
+  # Returns a hash of result data, including the (decoded) remote upgrade JSON containing
+  # the gear level upgrade details in the +:upgrade_result+ key.
   #
   # NOTE: all exceptions are trapped and added to the +errors+ array within the
-  # results hash. This method should always return the hash.
+  # results hash. This method should always return the hash and should never
+  # bubble exceptions.
+  #
   def upgrade_gear(login, app_name, gear_uuid, version, ignore_cartridge_version=false)
     total_upgrade_gear_start_time = (Time.now.to_f * 1000).to_i
 
@@ -574,6 +639,11 @@ class Upgrader
     gear_result
   end
 
+  ##
+  # Builds a simply textual summary of an +upgrade+ result hash.
+  #
+  # Returns the report as a string.
+  #
   def build_text_summary(upgrade_result)
     buf = []
 
@@ -667,6 +737,7 @@ class Upgrader
 
   ##
   # Appends +value+ to +filename+.
+  #
   def append_to_file(filename, value)
     FileUtils.touch filename unless File.exists?(filename)
 
@@ -683,6 +754,7 @@ class Upgrader
   # a timeout of +timeout+.
   #
   # Returns [+output+, +exitcode+] of the process.
+  #
   def execute_script(cmd, num_tries=1, timeout=28800)
     exitcode = nil
     output = ''
