@@ -29,9 +29,11 @@ class Upgrader
   #
   # 4. Generate reports based on all output and emit them to stdout.
   #
-  # The upgrade process is meant to be re-entrant. If existing itineraries exist, processing
-  # will continue using them. Failed gear upgrades result in a rerun itinerary which will result
-  # in a continuation of just those previous failures.
+  # The upgrade process is meant to be re-entrant. If an existing node itinerary exists, processing
+  # will continue from that itinerary. If no itinerary exists, but a rerun itinerary exists, processing
+  # will proceed using the rerun itinerary (effectively re-running the errors from the previous run). If
+  # no itineraries exist for the node, the upgrade for that node is considered complete and no processing
+  # will occur for the node.
   #
   # The upgrade is considered a success if there are no node itineraries or rerun itineraries
   # corresponding to any nodes following the upgrade.
@@ -426,8 +428,7 @@ class Upgrader
   # files and forking a call back to +upgrade_node_from_itinerary+.
   #
   # The upgrade logic will continue or retry depending on the presence of the appropriate
-  # itinerary files, and will do nothing if there are no itineraries (or if both itinerary
-  # types are detected, which is an illegal state).
+  # itinerary files, and will do nothing if there are no itineraries.
   def upgrade_node(server_identity)
     raise "No server identity specified" unless server_identity
 
@@ -440,11 +441,6 @@ class Upgrader
     # if there's no itinerary of any sort, there's nothing to do on this node
     unless File.exists?(itinerary_file) || File.exists(rerun_file)
       puts "Nothing to migrate for node #{server_identity}; no itinerary files exist"
-      return
-    end
-
-    if File.exists?(itinerary_file) && File.exists?(rerun_file)
-      puts "Warning: node #{server_identity} has both an itinerary and a rerun itinerary. This is an unexpected state and the node will be skipped."
       return
     end
 
