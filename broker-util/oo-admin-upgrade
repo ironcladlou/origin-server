@@ -44,7 +44,7 @@ class Upgrader
   #                              will be performed regardless of the source and target versions.
   #                              Default is +false+.
   #
-  #  :target_server_itentity   - If present, causes the cluster itinerary to contain only the
+  #  :target_server_identity   - If present, causes the cluster itinerary to contain only the
   #                              specified node.
   #
   #  :upgrade_position         - TODO: Default is +1+.
@@ -684,7 +684,7 @@ class Upgrader
       buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
     end 
 
-    failed_gears_total = failed_gears_per_node.values.inject{|sum,x| sum + x} || 0
+    failed_gears_total = failed_gears_per_node.values.inject(0, :+)
     upgrader_position_nodes = upgrade_result[:metadata]['upgrader_position_nodes']
 
     buf << "#####################################################"
