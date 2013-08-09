@@ -770,27 +770,33 @@ class Upgrader
       end
     end
 
-    unless leftover_gears_per_node.empty?
+    failed_gears_total = failed_gears_per_node.values.inject(0, :+)
+    leftover_gears_total = leftover_gears_per_node.values.inject(0, :+)
+
+    if leftover_gears_per_node.length > 0 || failed_gears_per_node.length > 0
       buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
-      buf << "Leftover gears found in gear queues:"
-      leftover_gears_per_node.each do |server_identity, count|
-        buf << "  #{server_identity}: #{count}"
+      buf << "The upgrade was incomplete due to unprocessed or failed gears"
+      buf << "remaining in node gear queues:"
+      unless leftover_gears_per_node.empty?
+        puts ""
+        puts "#{leftover_gears_total} unprocessed gears:"
+        leftover_gears_per_node.each do |server_identity, count|
+          buf << "  #{server_identity}: #{count}"
+        end
       end
-      buf << "You can run the upgrade again to continue"
+
+      unless failed_gears_per_node.empty?
+        puts ""
+        puts "#{failed_gears_total} failed gears:"
+        failed_gears_per_node.each do |server_identity, count|
+          buf << "  #{server_identity}: #{count}"
+        end
+      end
+      buf << ""
+      buf << "You can run the upgrade again with the same arguments to continue."
       buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
     end
 
-    unless failed_gears_per_node.empty?
-      buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
-      buf << "Failed gears found in gear rerun queues:"
-      failed_gears_per_node.each do |server_identity, count|
-        buf << "  #{server_identity}: #{count}"
-      end
-      buf << "You can run the upgrade again to rerun the failed gears"
-      buf << "!!!!!!!!!!WARNING!!!!!!!!!!!!!WARNING!!!!!!!!!!!!WARNING!!!!!!!!!!"
-    end 
-
-    failed_gears_total = failed_gears_per_node.values.inject(0, :+)
     upgrader_position_nodes = upgrade_result.cluster_metadata.upgrader_position_nodes
 
     buf << "#####################################################"
@@ -798,6 +804,7 @@ class Upgrader
     buf << "# of users: #{upgrade_result.cluster_metadata.logins_count}"
     buf << "# of gears: #{upgrade_result.gear_count}"
     buf << "# of failures: #{failed_gears_total}"
+    buf << "# of leftovers: #{leftover_gears_total}"
     buf << "Gear counts per thread: #{upgrade_result.gear_counts.pretty_inspect}"
     buf << "Nodes upgraded: #{upgrader_position_nodes.pretty_inspect}" if !upgrader_position_nodes.empty?
     buf << "Timings:"
