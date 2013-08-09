@@ -17,12 +17,12 @@ module OpenShift
     #
     class UpgradePersistable
       def initialize(args)
-        instance_variables.each{|v| send("#{v}=", args[v.to_sym])}
+        args.each{|k, v| send("#{k.to_s}=", v)}
       end
 
       def jsonish_self
         hash = {}
-        instance_variables.each {|v| hash[v] = instance_variable_get(v)}
+        instance_variables.each {|v| hash[v.to_s[1..-1]] = instance_variable_get(v)}
         hash
       end
 
@@ -49,7 +49,7 @@ module OpenShift
                     :upgrader_position_nodes,
                     :times
 
-      def initialize(args)
+      def initialize(args = {})
         super(args)
 
         @logins_count ||= 0
@@ -67,7 +67,8 @@ module OpenShift
                     :ignore_cartridge_version,
                     :active_gear_length,
                     :inactive_gear_length,
-                    :gears_length
+                    :gears_length,
+                    :version
 
       def initialize(args)
         super(args)
@@ -79,7 +80,7 @@ module OpenShift
 
       def self.entries_from_json_array_file(file)
         entries = []
-        File.readlines(file).each do |line|
+        File.readlines(file).each do |json|
           entries << self.from_json(json)
         end
         entries
@@ -120,7 +121,7 @@ module OpenShift
                     :starting_node_queue,
                     :incomplete_node_queue
 
-      def initialize(args)
+      def initialize(args = {})
         super(args)
 
         @times ||= {}
@@ -146,7 +147,7 @@ module OpenShift
                     :remote_upgrade_result,
                     :remote_exit_code
 
-      def initialize(args)
+      def initialize(args = {})
         super(args)
 
         @errors ||= []
@@ -265,12 +266,12 @@ class Upgrader
     upgrade_result.starting_node_queue = OpenShift::Upgrader::NodeQueueEntry.entries_from_json_array_file(node_queue_path)
     upgrade_result.cluster_metadata = metadata
 
-    puts "#####################################################"
     if !metadata.upgrader_position_nodes.empty?
+      puts "#####################################################"
       puts 'Nodes this upgrader is handling:'
       puts metadata.upgrader_position_nodes.pretty_inspect
+      puts "#####################################################"
     end
-    puts "#####################################################"
 
     node_threads = []
     mutex = Mutex.new
@@ -527,7 +528,7 @@ class Upgrader
   #
   def write_gear_queue(node, gears)
     gear_queue_file = gear_queue_path(node.server_identity)
-    puts "Writing #{gears.length} to gear queue for node #{node.server_identity} at #{gear_queue_file}"
+    puts "Writing #{gears.length} entries to gear queue for node #{node.server_identity} at #{gear_queue_file}"
     
     gears.each do |gear|
       queue_entry = OpenShift::Upgrader::GearQueueEntry.new({
@@ -716,10 +717,10 @@ class Upgrader
             end
           end
 
-          gear_result.remote_upgrade_result = JSON.load(upgrade_result_json)
+          gear_result.remote_upgrade_result = JSON.load(remote_result_json)
           gear_result.remote_exit_code = exit_code
 
-          unless gear_result.remote_upgrade_result]['upgrade_complete']
+          unless gear_result.remote_upgrade_result['upgrade_complete']
             gear_result.errors << "Gear upgrade result is marked incomplete"
           end
 
@@ -735,7 +736,7 @@ class Upgrader
     rescue Timeout::Error => e
       gear_result.errors << "Remote upgrade timed out"
     rescue => e
-      gear_result.errors << "Upgrade failed: #{e.message}"
+      gear_result.errors << "Upgrade failed: #{e.message}\n#{e.backtrace.join("\n")}"
     end
 
     total_upgrade_gear_time = (Time.now.to_f * 1000).to_i - total_upgrade_gear_start_time
@@ -755,7 +756,7 @@ class Upgrader
     leftover_gears_per_node = {}
     failed_gears_per_node = {}
 
-    upgrade_result.original_node_queue.each do |node|
+    upgrade_result.starting_node_queue.each do |node|
       server_identity = node.server_identity
       gear_queue_file = gear_queue_path(server_identity)
       gear_rerun_queue_file = gear_rerun_queue_path(server_identity)
@@ -790,12 +791,12 @@ class Upgrader
     end 
 
     failed_gears_total = failed_gears_per_node.values.inject(0, :+)
-    upgrader_position_nodes = upgrade_result.metadata.upgrader_position_nodes
+    upgrader_position_nodes = upgrade_result.cluster_metadata.upgrader_position_nodes
 
     buf << "#####################################################"
     buf << "Summary:"
-    buf << "# of users: #{upgrade_result.metadata.logins_count}"
-    buf << "# of gears: #{upgrade_result.gear_count]}"
+    buf << "# of users: #{upgrade_result.cluster_metadata.logins_count}"
+    buf << "# of gears: #{upgrade_result.gear_count}"
     buf << "# of failures: #{failed_gears_total}"
     buf << "Gear counts per thread: #{upgrade_result.gear_counts.pretty_inspect}"
     buf << "Nodes upgraded: #{upgrader_position_nodes.pretty_inspect}" if !upgrader_position_nodes.empty?
@@ -804,7 +805,7 @@ class Upgrader
       buf << "    #{topic}=#{time_in_millis.to_f/1000}s"
     end
     buf << "Additional timings:"
-    upgrade_result.metadata.times.each do |topic, time_in_millis|
+    upgrade_result.cluster_metadata.times.each do |topic, time_in_millis|
       buf << "    #{topic}=#{time_in_millis.to_f/1000}s"
     end
     buf << "#####################################################"
@@ -927,7 +928,7 @@ class UpgraderCli < Thor
   def upgrade_gear
     with_upgrader do |upgrader|
       gear_result = upgrader.upgrade_gear(options.login, options.app_name, options.upgrade_gear, options.version, options.ignore_cartridge_version?)
-      puts JSON.dump(gear_result)
+      puts gear_result.to_json
     end
   end
 
@@ -949,13 +950,11 @@ class UpgraderCli < Thor
                                                                                 "all gears."
   method_option :max_threads, :type => :numeric, :required => false, :desc =>  "Indicates the number of processing queues"
   def upgrade_node
-    if (options.num_upgraders && !options.upgrade_position)
-      || (options.upgrade_position && !options.num_upgraders)
+    if (options.num_upgraders && !options.upgrade_position) || (options.upgrade_position && !options.num_upgraders)
       puts "--num-upgraders and --upgrade-position must be specified together"
       exit 1
     end
 
-    end
     with_upgrader do |upgrader|
       args = {
         version: options.version,
