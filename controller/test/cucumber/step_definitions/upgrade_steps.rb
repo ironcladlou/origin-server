@@ -335,15 +335,23 @@ Then /^the invocation markers from the gear upgrade should exist$/ do
   assert_file_exist File.join($home_root, @app.uid, %w(app-root data .gear_upgrade_post))
 end
 
-When /^the gears on the node are upgraded with oo-admin-upgrade( --rerun)?$/ do |rerun|
-  upgrade_cmd = "oo-admin-upgrade upgrade_node --version='expected'"
+When /^the gears on the node are upgraded with oo-admin-upgrade?$/ do
+  upgrade_cmd = "oo-admin-upgrade upgrade-node --version='expected'"
 
-  if rerun
-    upgrade_cmd = "oo-admin-upgrade upgrade-node --version='expected' --mode=rerun"
-  end
-
+  $logger.info("Executing upgrade cmd: #{upgrade_cmd}")
   output = `#{upgrade_cmd}`
 
   $logger.info("Upgrade output: #{output}")
   assert_equal 0, $?.exitstatus
+end
+
+Then /^existing oo-admin-upgrade output is archived$/ do
+  files = Dir.glob('/tmp/oo-upgrade/*').select { |fn| File.file?(fn) }
+  unless files.empty?
+    timestamp = Time.now.strftime("%Y-%m-%d-%H%M%S")
+    archive_dir = "/tmp/oo-upgrade/cucumber_archive_#{timestamp}"
+    FileUtils.mkdir(archive_dir)
+    $logger.info("Archiving test upgrade output to #{archive_dir}")
+    FileUtils.mv files, archive_dir
+  end
 end

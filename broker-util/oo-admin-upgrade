@@ -559,7 +559,7 @@ class Upgrader
     error_file = error_file_path(server_identity)
 
     # if there's no queue of any sort, there's nothing to do on this node
-    unless File.exists?(gear_queue_file) || File.exists(rerun_queue_file)
+    unless File.exists?(gear_queue_file) || File.exists?(rerun_queue_file)
       puts "Nothing to migrate for node #{server_identity}; no gear queue or rerun queue files exist"
       return
     end
@@ -777,16 +777,16 @@ class Upgrader
       buf << "The upgrade was incomplete due to unprocessed or failed gears"
       buf << "remaining in node gear queues:"
       unless leftover_gears_per_node.empty?
-        puts ""
-        puts "#{leftover_gears_total} unprocessed gears:"
+        buf << ""
+        buf << "#{leftover_gears_total} unprocessed gears:"
         leftover_gears_per_node.each do |server_identity, count|
           buf << "  #{server_identity}: #{count}"
         end
       end
 
       unless failed_gears_per_node.empty?
-        puts ""
-        puts "#{failed_gears_total} failed gears:"
+        buf << ""
+        buf << "#{failed_gears_total} failed gears:"
         failed_gears_per_node.each do |server_identity, count|
           buf << "  #{server_identity}: #{count}"
         end

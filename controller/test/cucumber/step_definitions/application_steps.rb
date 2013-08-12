@@ -427,13 +427,13 @@ end
 
 Then /^the (.+) application should (not )?be accessible$/ do |app_name, negate|
   app = @test_apps_hash[app_name]
-  assert_application_accessible(app)
+  assert_application_accessible(app, negate)
 end
 
 def assert_application_accessible(app, negate=false)
   if negate
-    app.is_accessible?.should be_false
-    app.is_accessible?(true).should be_false
+    app.is_accessible?(false, 1).should be_false
+    app.is_accessible?(true, 1).should be_false
   else
     app.is_accessible?.should be_true
     app.is_accessible?(true).should be_true
