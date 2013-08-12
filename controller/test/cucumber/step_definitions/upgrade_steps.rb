@@ -127,12 +127,17 @@ echo "version: $version"
 
 if [ "$version" == "0.1" ]; then
   if [ -f $MOCK_STATE/upgrade_script_first_invocation ]; then
-    touch $MOCK_STATE/upgrade_invoked
-    echo "success"
-    exit 0
+    touch $MOCK_STATE/upgrade_script_second_invodation
+    echo "second invocation"
+    exit 1
   else
-    echo "failing"
+    echo "first invocation"
     touch $MOCK_STATE/upgrade_script_first_invocation
+    exit 1
+  fi
+
+  if [ -f $MOCK_STATE/upgrade_script_second_invodation ]; then
+    echo "third invocation"
     exit 1
   fi
 else
