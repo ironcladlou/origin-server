@@ -37,7 +37,7 @@ Feature: Cartridge upgrades
     And a new client created mock-0.1 application named mock1
     And a new client created mock-0.2 application named mock2
     And the mock invocation markers are cleared in mock1
-    #And the mock invocation markers are cleared in mock2
+    And the mock invocation markers are cleared in mock2
     And a rigged version of the mock-0.1 cartridge set to fail 2 times
 
     When existing oo-admin-upgrade output is archived
@@ -54,6 +54,6 @@ Feature: Cartridge upgrades
     Then the mock cartridge version should be updated in mock2
 
     When the gears on the node are upgraded with oo-admin-upgrade
-    Then unprocessed ERB templates should exist in mock1
+    Then no unprocessed ERB templates should exist in mock1
     And the invocation markers from an incompatible upgrade should exist in mock1
     And the mock1 application should be accessible

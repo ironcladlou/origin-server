@@ -570,7 +570,7 @@ class Upgrader
       puts "Re-running failures from previous upgrade of node #{server_identity} from rerun gear queue at #{rerun_queue_file}"
       
       timestamp = Time.now.strftime("%Y-%m-%d-%H%M%S")
-      archive_error_file = "#{error_file}-#{timestamp}"
+      archive_error_file = "#{error_file}_#{timestamp}"
       puts "Archiving previous error file from #{error_file} to #{archive_error_file}"
       FileUtils.mv error_file, archive_error_file
 
