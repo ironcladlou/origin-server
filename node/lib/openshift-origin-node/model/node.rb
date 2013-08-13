@@ -53,6 +53,7 @@ module OpenShift
             print "OK\n" if oo_debug
           rescue Exception => e
             print "ERROR\n" if oo_debug
+            print "#{e.message}\n#{e.backtrace.inspect}\n" unless porcelain
           end
         end
 
