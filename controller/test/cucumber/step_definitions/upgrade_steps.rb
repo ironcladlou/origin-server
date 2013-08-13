@@ -61,7 +61,7 @@ Given /^the expected version of the ([^ ]+)\-([\d\.]+) cartridge is installed$/ 
   # cartridge component we're looking for
   assert component_version = manifest_from_package['Version']
 
-  assert cart_repo.exist?(cart_name, manifest_from_package['Cartridge-Version'], manifest_from_package['Version']), "expected #{cart_name} version must exist"
+  assert cart_repo.exist?(cart_name, manifest_from_package['Version'], manifest_from_package['Cartridge-Version']), "expected #{cart_name} version must exist"
 end
 
 Given /^a compatible version of the ([^ ]+)\-([\d\.]+) cartridge$/ do |cart_name, component_version|

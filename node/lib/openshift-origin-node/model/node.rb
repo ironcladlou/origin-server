@@ -45,9 +45,9 @@ module OpenShift
             cooked = cartridge
             print "Loading #{cooked.name}-#{cooked.version}..." if oo_debug
 
-            v1_manifest            = Marshal.load(Marshal.dump(cooked.manifest))
-            v1_manifest['Version'] = cooked.version
-            carts.push OpenShift::Cartridge.new.from_descriptor(v1_manifest)
+            # v1_manifest            = Marshal.load(Marshal.dump(cooked.manifest))
+            # v1_manifest['Version'] = cooked.version
+            carts.push OpenShift::Cartridge.new.from_descriptor(cooked)
             print "OK\n" if oo_debug
           rescue Exception => e
             print "ERROR\n" if oo_debug
