@@ -30,12 +30,20 @@ module OpenShift
         JSON.dump(jsonish_self)
       end
 
+      def self.from_json(json)
+        self.new(JSON.load(json))
+      end
+
       def self.from_json_file(file)
         self.new(JSON.parse(IO.read(file)))
       end
 
-      def self.from_json(json)
-        self.new(JSON.load(json))
+      def self.entries_from_json_array_file(file)
+        entries = []
+        File.readlines(file).each do |json|
+          entries << self.from_json(json)
+        end
+        entries
       end
     end
 
@@ -76,14 +84,6 @@ module OpenShift
         @gears_length ||= 0
         @active_gear_length ||= 0
         @inactive_gear_length ||= 0
-      end
-
-      def self.entries_from_json_array_file(file)
-        entries = []
-        File.readlines(file).each do |json|
-          entries << self.from_json(json)
-        end
-        entries
       end
     end
 
