@@ -38,7 +38,7 @@ Feature: Cartridge upgrades
     And a new client created mock-0.2 application named mock2
     And the mock invocation markers are cleared in mock1
     #And the mock invocation markers are cleared in mock2
-    And a rigged version of the mock-0.1 cartridge
+    And a rigged version of the mock-0.1 cartridge set to fail 2 times
 
     When existing oo-admin-upgrade output is archived
     And the gears on the node are upgraded with oo-admin-upgrade

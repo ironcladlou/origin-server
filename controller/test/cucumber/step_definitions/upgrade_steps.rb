@@ -80,9 +80,9 @@ Given /^an incompatible version of the ([^ ]+)\-([\d\.]+) cartridge$/ do |cart_n
   rewrite_and_install(current_manifest, @manifest_path)
 end
 
-Given /^a rigged version of the ([^ ]+)\-([\d\.]+) cartridge$/ do |cart_name, component_version|
+Given /^a rigged version of the ([^ ]+)\-([\d\.]+) cartridge set to fail (\d) times$/ do |cart_name, component_version, max_failures|
   current_manifest = prepare_cart_for_rewrite(cart_name, component_version)
-  create_rigged_upgrade_script(@upgrade_script_path)
+  create_rigged_upgrade_script(@upgrade_script_path, max_failures)
 
   rewrite_and_install(current_manifest, @manifest_path)
 end
@@ -112,7 +112,7 @@ EOF
   IO.write(target, upgrade_script, 0, mode: 'w', perm: 0744)
 end
 
-def create_rigged_upgrade_script(target)
+def create_rigged_upgrade_script(target, max_failures = 1)
   upgrade_script = <<-EOF
 #!/bin/bash
 
@@ -122,27 +122,25 @@ source $OPENSHIFT_MOCK_DIR/mock.conf
 version=$1
 current_software_version=$2
 next_software_version=$3
+max_failures=#{max_failures}
 
-echo "version: $version"
+if [ -f $MOCK_STATE/upgrade_script_failure_count ]; then
+  num_failures=$(<$MOCK_STATE/upgrade_script_failure_count)
+else
+  num_failures=0
+fi
+
+echo "version: $version, max_failures: $max_failures, num_failures=$num_failures"
 
 if [ "$version" == "0.1" ]; then
-  if [ -f $MOCK_STATE/upgrade_script_first_invocation ]; then
-    touch $MOCK_STATE/upgrade_script_second_invodation
-    echo "second invocation"
-    exit 1
-  else
-    echo "first invocation"
-    touch $MOCK_STATE/upgrade_script_first_invocation
+  if [ $num_failures -lt $max_failures ]; then
+    echo -n $(expr $num_failures + 1) > $MOCK_STATE/upgrade_script_failure_count
+    echo "rigged upgrade script is failing"
     exit 1
   fi
-
-  if [ -f $MOCK_STATE/upgrade_script_second_invodation ]; then
-    echo "third invocation"
-    exit 1
-  fi
-else
-  touch $MOCK_STATE/upgrade_invoked
 fi
+
+touch $MOCK_STATE/upgrade_invoked
 
 exit 0
 EOF
