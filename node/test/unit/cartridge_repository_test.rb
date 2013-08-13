@@ -40,6 +40,13 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
     end
   end
 
+  def populate_manifest_special(manifests = {})
+    manifests.each_pair do |manifest_file, manifest|
+      FileUtils.mkpath File.dirname(manifest_file)
+      File.open(manifest_file, 'w') { |file| file << manifest }
+    end
+  end
+
   def test_insert
     populate_manifest(%W(#{@path}/redhat-crtest/0.0.1/metadata/manifest.yml))
 
@@ -83,6 +90,7 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
     assert_equal '0.0.2', e.cartridge_version
     assert e.categories.include?('service')
     assert e.versions.include?('0.1')
+    assert e.manifest['Group-Overrides'][0]['components'].include?('crtest-0.1')
 
     e = cr.select('crtest', '0.2')
     refute_nil e
@@ -92,6 +100,7 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
     assert_equal '0.2', e.version
     assert_equal '0.0.2', e.cartridge_version
     assert_empty e.categories
+    assert e.manifest['Group-Overrides'][0]['components'].include?('crtest-0.2')
   end
 
   def test_erase
@@ -166,11 +175,13 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
     refute_nil e
     assert_equal '0.2', e.version
     assert_equal '0.0.3', e.cartridge_version
+    assert e.manifest['Group-Overrides'][0]['components'].include?('crtest-0.2')
     
     e  = cr.select('crtest', '0.3')
     refute_nil e
     assert_equal '0.3', e.version
     assert_equal '0.0.3', e.cartridge_version
+    assert e.manifest['Group-Overrides'][0]['components'].include?('crtest-0.3')
 
     e  = cr['crtest', '0.3']
     refute_nil e
@@ -204,6 +215,59 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
     assert_raise(KeyError) do
       cr.select('crtest', '0.4')
     end
+  end
+
+  def test_insane_node_func_case
+    manifest = %q{#
+        Name: crtest
+        Display-Name: crtest Unit Test
+        Cartridge-Short-Name: CRTEST
+        Version: '0.3'
+        Versions: ['0.1', '0.2', '0.3']
+        Cartridge-Version: '0.0.1'
+        Cartridge-Vendor: redhat
+        Group-Overrides:
+          - components:
+            - crtest-0.3
+            - web_proxy
+        Version-Overrides:
+          '0.1':
+            Group-Overrides:
+              - components:
+                - crtest-0.1
+                - web_proxy
+          '0.2':
+            Group-Overrides:
+              - components:
+                - crtest-0.2
+                - web_proxy
+      }
+
+    populate_manifest_special({"#{@path}/redhat-crtest/0.0.1/metadata/manifest.yml" => manifest})
+
+    cr = OpenShift::Runtime::CartridgeRepository.instance
+    cr.load
+
+    e = cr.select('crtest', '0.1')
+    refute_nil e
+    assert_equal 'crtest', e.name
+    assert_equal '0.1', e.version
+    assert_equal '0.0.1', e.cartridge_version
+    assert e.manifest['Group-Overrides'][0]['components'].include?('crtest-0.1')
+
+    e = cr.select('crtest', '0.2')
+    refute_nil e
+    assert_equal 'crtest', e.name
+    assert_equal '0.2', e.version
+    assert_equal '0.0.1', e.cartridge_version
+    assert e.manifest['Group-Overrides'][0]['components'].include?('crtest-0.2')
+
+    e = cr.select('crtest', '0.3')
+    refute_nil e
+    assert_equal 'crtest', e.name
+    assert_equal '0.3', e.version
+    assert_equal '0.0.1', e.cartridge_version
+    assert e.manifest['Group-Overrides'][0]['components'].include?('crtest-0.3')
   end
 
   MANIFESTS = [
@@ -248,6 +312,16 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
         Versions: ['0.2', '0.3']
         Cartridge-Version: '0.0.3'
         Cartridge-Vendor: redhat
+        Group-Overrides:
+          - components:
+            - crtest-0.3
+            - web_proxy
+        Version-Overrides:
+          '0.2':
+            Group-Overrides:
+              - components:
+                - crtest-0.2
+                - web_proxy
       },
   ]
 end
