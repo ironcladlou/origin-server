@@ -42,16 +42,17 @@ module OpenShift
         carts = []
         CartridgeRepository.instance.latest_versions do |cartridge|
           begin
-            cooked = cartridge
-            print "Loading #{cooked.name}-#{cooked.version}..." if oo_debug
+            print "Loading #{cartridge.name}-#{cartridge.version}..." if oo_debug
+            print cartridge.manifest if oo_debug
 
-            # v1_manifest            = Marshal.load(Marshal.dump(cooked.manifest))
-            # v1_manifest['Version'] = cooked.version
-            carts.push OpenShift::Cartridge.new.from_descriptor(cooked)
+            # Deep copy is necessary here because OpenShift::Cartridge makes destructive changes
+            # to the hash passed to from_descriptor
+            v1_manifest            = Marshal.load(Marshal.dump(cartridge.manifest))
+            v1_manifest['Version'] = cartridge.version
+            carts.push OpenShift::Cartridge.new.from_descriptor(v1_manifest)
             print "OK\n" if oo_debug
           rescue Exception => e
             print "ERROR\n" if oo_debug
-            print "#{e.message}\n#{e.backtrace.inspect}\n" unless porcelain
           end
         end
 
