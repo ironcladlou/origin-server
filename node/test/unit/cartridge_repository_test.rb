@@ -76,6 +76,9 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
 
     e = cr.select('crtest', '0.1')
     refute_nil e
+    assert_equal 'crtest', e.name
+    assert_equal 'crtest', e.manifest['Name']
+    assert_equal 'crtest', e.manifest['Display-Name']
     assert_equal '0.1', e.version
     assert_equal '0.0.2', e.cartridge_version
     assert e.categories.include?('service')
@@ -83,6 +86,9 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
 
     e = cr.select('crtest', '0.2')
     refute_nil e
+    assert_equal 'crtest', e.name
+    assert_equal 'crtest', e.manifest['Name']
+    assert_equal 'crtest2', e.manifest['Display-Name']
     assert_equal '0.2', e.version
     assert_equal '0.0.2', e.cartridge_version
     assert_empty e.categories
@@ -174,6 +180,12 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
     lookup = {'0.1' => '0.0.2', '0.2' => '0.0.3', '0.3' => '0.0.3'}
 
     latest = cr.latest_versions
+
+    latest.each do |cart|
+      assert_equal 'crtest', cart.name
+      assert_equal 'crtest', cart.manifest['Name']
+    end
+
     latest.delete_if do |cart|
       cart.cartridge_version == lookup[cart.version]
     end
@@ -207,17 +219,27 @@ class CartridgeRepositoryTest < OpenShift::NodeTestCase
       %q{#
         Name: crtest
         Cartridge-Short-Name: crtest
+        Display-Name: crtest2
         Version: '0.2'
         Versions: ['0.1', '0.2']
         Cartridge-Version: '0.0.2'
         Compatible-Versions: ['0.0.1']
         Cartridge-Vendor: redhat
         Source-Url: http://example.com
+        Group-Overrides:
+          - components:
+            - crtest-0.2
+            - web_proxy
         Version-Overrides:
           '0.1':
+            Display-Name: crtest
             Categories:
               - service
             Versions: ['0.2']
+            Group-Overrides:
+              - components:
+                - crtest-0.1
+                - web_proxy
       },
       %q{#
         Name: crtest
