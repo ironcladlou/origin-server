@@ -228,7 +228,7 @@ module OpenShift
                 ) unless versions.include?(version.to_s)
 
           @version = version.to_s
-
+          @manifest['Version'] = @version
         else
           @version = @manifest['Version'].to_s
         end
@@ -239,9 +239,12 @@ module OpenShift
 
         # If version overrides are present, merge them on top of the manifest
         if @manifest.has_key?('Version-Overrides')
-          vtree = @manifest['Version-Overrides'][version]
-          @manifest.merge!(vtree) if vtree
-          @manifest['Version'] = version
+          vtree = @manifest['Version-Overrides'][@version]
+          puts vtree
+
+          if vtree
+            @manifest.merge!(vtree) 
+          end
         end
 
         @cartridge_vendor       = @manifest['Cartridge-Vendor']
