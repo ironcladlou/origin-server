@@ -146,7 +146,7 @@ module OpenShift
       #   CartridgeRepository.instance['php', '3.5']                #=> Cartridge
       #
       def select(cartridge_name, version, cartridge_version = '_')
-        unless exist?(cartridge_name, cartridge_version, version)
+        unless exist?(cartridge_name, version, cartridge_version)
           raise KeyError.new("key not found: (#{cartridge_name}, #{version}, #{cartridge_version})")
         end
 
@@ -189,7 +189,7 @@ module OpenShift
       #
       #   CartridgeRepository.instance.erase('php', '3.5', '1.0') #=> Cartridge
       def erase(cartridge_name, version, cartridge_version)
-        unless exist?(cartridge_name, cartridge_version, version)
+        unless exist?(cartridge_name, version, cartridge_version)
           raise KeyError.new("key not found: (#{cartridge_name}, #{version}, #{cartridge_version})")
         end
 
@@ -211,12 +211,12 @@ module OpenShift
       end
 
       # :call-seq:
-      #   CartridgeRepository.instance.exists?(cartridge_name, cartridge_version, version)  -> true or false
+      #   CartridgeRepository.instance.exist?(cartridge_name, cartridge_version, version)  -> true or false
       #
       # Is there an entry in the repository for this tuple?
       #
-      #   CartridgeRepository.instance.erase('cobol', '2002', '1.0') #=> false
-      def exist?(cartridge_name, cartridge_version, version)
+      #   CartridgeRepository.instance.exist?('cobol', '2002', '1.0') #=> false
+      def exist?(cartridge_name, version, cartridge_version)
         @index.key?(cartridge_name) &&
             @index[cartridge_name].key?(version) &&
             @index[cartridge_name][version].key?(cartridge_version)
@@ -253,9 +253,11 @@ module OpenShift
       def remove(cartridge_name, version, cartridge_version) # :nodoc:
         recompute_cartridge_version = false
 
-        if !@index.key?(cartridge_name)
-          raise KeyError.new()
+        unless exist?(cartridge_name, version, cartridge_version)
+          raise KeyError.new("key not found: (#{cartridge_name}, #{version}, #{cartridge_version})")
         end
+
+        logger.debug "Removing (#{cartridge_name}, #{version}, #{cartridge_version}) from index"
 
         slice = @index[cartridge_name]
 
@@ -264,13 +266,17 @@ module OpenShift
         end
 
         slice[version].delete(cartridge_version)
+        real_cart_versions = slice[version].keys
+        real_cart_versions.delete('_')
 
-        if slice[version].empty?
+        if real_cart_versions.empty?
+          logger.debug("No more cartridge versions for (#{cartridge_name}, #{version}), deleting from index")
           slice.delete(version)
           recompute_cartridge_version = false
 
           if slice.empty?
-            @index.delete[cartridge_name]
+            logger.debug "No more versions left for #{cartridge_name}, deleting from index"
+            @index.delete(cartridge_name)
           end
         end
 
@@ -278,7 +284,7 @@ module OpenShift
           latest_cartridge_version = latest_version(slice[version])
 
           if latest_cartridge_version
-            manifest = select(cartridge_name, version, latest_cartridge_version)
+            manifest = @index[cartridge_name][version][latest_cartridge_version]
             @index[cartridge_name][version]['_'] = manifest
           end
         end
