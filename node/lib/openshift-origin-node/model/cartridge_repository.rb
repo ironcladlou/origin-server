@@ -302,7 +302,6 @@ module OpenShift
         cartridge_version = cartridge.cartridge_version
 
         cartridge.versions.sort.each do |version|
-          logger.info("Projecting Version-Overrides for #{version}")
           projected_cartridge = cartridge.project_version_overrides(version, @path)
 
           @index[name][version][cartridge_version] = projected_cartridge
