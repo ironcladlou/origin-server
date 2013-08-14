@@ -43,7 +43,6 @@ module OpenShift
         CartridgeRepository.instance.latest_versions do |cartridge|
           begin
             print "Loading #{cartridge.name}-#{cartridge.version}..." if oo_debug
-            print cartridge.manifest if oo_debug
 
             # Deep copy is necessary here because OpenShift::Cartridge makes destructive changes
             # to the hash passed to from_descriptor
