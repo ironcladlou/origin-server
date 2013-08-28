@@ -1,0 +1,8 @@
+production:
+  sessions:
+    default:
+      database: openshift_broker_dev
+      hosts:
+        - localhost:27017
+      username: "openshift"
+      password: "mooo"
