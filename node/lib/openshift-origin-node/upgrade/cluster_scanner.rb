@@ -1,8 +1,21 @@
 module OpenShift
   module Runtime
     module Upgrade
-      class ClusterScanner
-        def self.find_gears_to_upgrade
+      module ClusterScanner
+        def find_gears_to_upgrade
+          gears = []
+          (1..5).each do |node_count|
+            (1..10).each do |gear_count|
+              gears << { uuid: "uuid#{node_count}-#{gear_count}", name: "gear#{node_count}-#{gear_count}",
+                         app_name: "app#{node_count}-#{gear_count}", node: "node#{node_count}",
+                         login: "login#{node_count}-#{gear_count}", active: [true, false].sample }
+            end
+          end
+          puts "synthesized #{gears.length} gears"
+          gears
+        end
+
+        def find_gears_to_upgrade_real
           require '/var/www/openshift/broker/config/environment'
           Rails.configuration.analytics[:enabled] = false
           Rails.configuration.msg_broker[:rpc_options][:disctimeout] = 20

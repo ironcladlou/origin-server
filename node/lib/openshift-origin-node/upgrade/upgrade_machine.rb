@@ -2,6 +2,7 @@
 require 'state_machine'
 require 'stomp'
 require 'mongoid'
+require 'json'
 
 require_relative 'cluster_scanner'
 
@@ -50,8 +51,16 @@ module OpenShift
         end
 
         def queue_upgrade
+          puts "queueing upgrade for #{self.uuid} (attempt #{self.num_attempts + 1} of #{self.max_attempts})"
+          
+          opts = { hosts: [ { login: "mcollective", passcode: "marionette", host: "localhost", port: 6163 } ] }
+          client = Stomp::Client.new(opts)
+
+          msg = { uuid: self.uuid, target_version: self.target_version }
+
+          ent.publish "mcollective.upgrade.node.#{self.node}", JSON.dump(msg)
+
           self.num_attempts += 1
-          puts "queueing upgrade for #{self.uuid} (attempt #{self.num_attempts} of #{self.max_attempts})"
         end
 
         def complete_upgrade(result = nil, *args)
@@ -81,9 +90,17 @@ module OpenShift
       end     
 
       class Coordinator
-        #include ClusterScanner
+        include ClusterScanner
 
         def initialize
+        end
+
+        def upgrade(execution)
+          machines = GearMachine.where(upgrade_execution_id: execution.id).order_by(:active.desc)
+          machines.each do |gm|
+            puts "will upgrade #{gm.uuid}:#{gm.active}"
+            #gm.upgrade if gm.can_upgrade?
+          end
         end
 
         def create_execution(target_version, max_attempts)
@@ -97,23 +114,12 @@ module OpenShift
             execution = UpgradeExecution.create(target_version: target_version)
 
             find_gears_to_upgrade.each do |gear|
-              execution.gear_machines << GearMachine.create(uuid: gear[:uuid], node: gear[:node], target_version: target_version, max_attempts: max_attempts, active: gear[:active])
+              execution.gear_machines << GearMachine.create(uuid: gear[:uuid], node: gear[:node], target_version: target_version, 
+                max_attempts: max_attempts, active: gear[:active])
             end
           end
 
           execution
-        end
-
-        def find_gears_to_upgrade # replace w/ ClusterScanner for real use
-          gears = []
-          (1..5).each do |node_count|
-            (1..10).each do |gear_count|
-              gears << { uuid: "uuid#{node_count}-#{gear_count}", name: "gear#{node_count}-#{gear_count}",
-                         app_name: "app#{node_count}-#{gear_count}", node: "node#{node_count}", login: "login#{node_count}-#{gear_count}", active: true }
-            end
-          end
-          puts "synthesized #{gears.length} gears"
-          gears
         end
       end
     end
@@ -126,4 +132,6 @@ include OpenShift::Runtime::Upgrade
 
 coord = Coordinator.new
 
-coord.create_execution('2.0.31', 2)
+execution = coord.create_execution('2.0.31', 2)
+
+coord.upgrade(execution)
