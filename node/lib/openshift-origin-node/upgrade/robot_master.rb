@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'json'
+require 'fileutils'
 require 'openshift-origin-node/utils/shell_exec'
 
 module OpenShift
@@ -13,7 +14,7 @@ module OpenShift
       end
 
       def initialize_store
-        Dir.mkdir('/tmp/oo-robo')
+        FileUtils.mkdir_p('/tmp/oo-robo')
       end
 
       def scale_to(count)
@@ -42,7 +43,7 @@ module OpenShift
       end
 
       def spawn_worker()
-        OpenShift::Runtime::Utils.oo_spawn("upgrade_robot.rb #{@url} #{@request_queue} #{@reply_queue} &")
+        OpenShift::Runtime::Utils.oo_spawn("upgrade_robot.rb #{@request_queue} #{@reply_queue} &")
       end
 
       def scale_down(count)
