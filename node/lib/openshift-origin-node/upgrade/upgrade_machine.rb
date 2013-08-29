@@ -77,7 +77,7 @@ module OpenShift
             attempt: self.num_attempts
           }
 
-          StompClient.instance.publish "mcollective.upgrade.node.#{self.node}", JSON.dump(msg)
+          StompClient.instance.publish "/queue/mcollective.upgrade.node.#{self.node}", JSON.dump(msg)
         end
 
         def complete_upgrade(result = nil, *args)
@@ -127,7 +127,7 @@ module OpenShift
 
           puts "Remaining machines: #{num_remaining}"
 
-          StompClient.instance.subscribe("mcollective.upgrade.results", {:ack => "client" }) do |msg|
+          StompClient.instance.subscribe("/queue/mcollective.upgrade.results", {:ack => "client" }) do |msg|
             begin
               remote_result = JSON.load(msg.body)
               gear_uuid = remote_result["uuid"]
