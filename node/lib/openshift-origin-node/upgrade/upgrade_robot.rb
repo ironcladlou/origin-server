@@ -76,8 +76,13 @@ pid_file = "/tmp/oo-robo/robot.pid.#{$$}"
 FileUtils.touch(pid_file)
 
 Signal.trap('TERM') do
-  puts "Cleaning up robot pidfile at #{pid_file}"
-  FileUtils.rm_f(pid_file) if File.exist?(pid_file)
+  begin
+    puts "Cleaning up robot pidfile at #{pid_file}"
+    FileUtils.rm_f(pid_file) if File.exist?(pid_file)
+  rescue
+  ensure
+    exit 0
+  end
 end
 
 opts = { hosts: [ { login: "mcollective", passcode: "marionette", host: '10.147.177.27', port: 6163 } ] }

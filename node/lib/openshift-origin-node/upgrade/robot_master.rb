@@ -26,7 +26,7 @@ module OpenShift
         workers_to_scale = count - current_count
 
         if (workers_to_scale < 0)
-          scale_down(workers_to_scale)
+          scale_down(workers_to_scale.abs)
         elsif (workers_to_scale > 0)
           scale_up(workers_to_scale)
         end
@@ -52,11 +52,10 @@ module OpenShift
         logger.debug("Spawning worker for request queue #{@request_queue} and reply queue: #{@reply_queue}")
 
         script = "/opt/rh/ruby193/root/usr/share/gems/gems/openshift-origin-node-1.14.0/lib/openshift-origin-node/upgrade/upgrade_robot.rb"
-        out, err, status = OpenShift::Runtime::Utils::oo_spawn("nohup #{script} #{@request_queue} #{@reply_queue} &")
+        
+        fork { OpenShift::Runtime::Utils::oo_spawn("nohup #{script} #{@request_queue} #{@reply_queue} &") }
 
-        raise "Failed to spawn worker (#{status}): stdout:\n#{out}\nstderr:#{err}" unless status == 0
-
-        logger.debug("Successfully spawned worker")
+        logger.debug("Spawned worker process")
       end
 
       def scale_down(count)
@@ -67,14 +66,16 @@ module OpenShift
 
           destroy_worker(pid)
 
-          break if i == count
+          break if (i+1) == count
         end
 
         logger.debug("Finished scaling down by #{count} workers")
       end
 
       def destroy_worker(pid)
-        OpenShift::Runtime::Utils::oo_spawn("kill -TERM #{pid} && rm -f /tmp/oo-robo/robot.pid.#{pid}")
+        logger.debug("Sending TERM to worker #{pid}")
+        out, err, status = OpenShift::Runtime::Utils::oo_spawn("kill -TERM #{pid}")
+        logger.debug("Terminated worked #{pid} (status=#{status}); out=#{out}, err=#{err}")
       end
     end
   end
