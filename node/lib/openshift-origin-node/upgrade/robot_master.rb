@@ -53,7 +53,8 @@ module OpenShift
 
         script = "/opt/rh/ruby193/root/usr/share/gems/gems/openshift-origin-node-1.14.0/lib/openshift-origin-node/upgrade/upgrade_robot.rb"
         
-        fork { OpenShift::Runtime::Utils::oo_spawn("nohup #{script} #{@request_queue} #{@reply_queue} &") }
+        job = fork { exec "nohup #{script} #{@request_queue} #{@reply_queue}" }
+        Process.detach(job)
 
         logger.debug("Spawned worker process")
       end
@@ -74,8 +75,7 @@ module OpenShift
 
       def destroy_worker(pid)
         logger.debug("Sending TERM to worker #{pid}")
-        out, err, status = OpenShift::Runtime::Utils::oo_spawn("kill -TERM #{pid}")
-        logger.debug("Terminated worked #{pid} (status=#{status}); out=#{out}, err=#{err}")
+        `kill -TERM #{pid}`
       end
     end
   end

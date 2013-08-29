@@ -14,7 +14,7 @@ module OpenShift
           gear_count = 0
 
           nodes.each do |node|
-            (1..10).each do
+            (1..25).each do
               gear_count += 1
               gears << { uuid: UUIDTools::UUID.random_create.to_s.delete('-'),
                          name: "gear#{gear_count}",

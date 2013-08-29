@@ -127,7 +127,7 @@ module OpenShift
 
           puts "Remaining machines: #{num_remaining}"
 
-          StompClient.instance.subscribe("/queue/mcollective.upgrade.results", {:ack => "client" }) do |msg|
+          StompClient.instance.subscribe("/queue/mcollective.upgrade.results", { :ack => "client", "activemq.prefetchSize" => 1 }) do |msg|
             begin
               remote_result = JSON.load(msg.body)
               gear_uuid = remote_result["uuid"]
@@ -150,7 +150,7 @@ module OpenShift
           end
 
           print "Waiting for gear replies..."
-          loop do
+          while num_remaining > 0
             num_remaining = GearMachine.where(upgrade_execution_id: execution.id, :state.in => [:new, :upgrading]).count
             
             sleep 1
@@ -158,6 +158,8 @@ module OpenShift
             print "."
             $stdout.flush
           end
+
+          print "Done."
         end
 
         def create_execution(target_version, max_attempts)
@@ -183,12 +185,16 @@ module OpenShift
   end
 end
 
+target_version = ARGV[0]
+
+raise "usage:  upgrade_machine.rb <target_version>" unless target_version
+
 Mongoid.load!("mongoid.yml")
 
 include OpenShift::Runtime::Upgrade
 
 coord = Coordinator.new
 
-execution = coord.create_execution('2.0.31', 2)
+execution = coord.create_execution(target_version, 2)
 
 coord.upgrade(execution)
