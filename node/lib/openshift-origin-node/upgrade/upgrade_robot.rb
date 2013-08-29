@@ -15,7 +15,7 @@ module OpenShift
       end
 
       def execute
-        log "Robot is starting to process requests from #{@request_queue}; replies => #{@reply_queue}"
+        puts "Robot is starting to process requests from #{@request_queue}; replies => #{@reply_queue}"
 
         msg_count = 0
         @client.subscribe(@request_queue, { :ack => "client", "activemq.prefetchSize" => 1 }) do |msg|
@@ -51,10 +51,11 @@ module OpenShift
 
             @client.publish(@reply_queue, JSON.dump(reply), {:persistent => true})
             @client.acknowledge(msg)
+
+            # TODO: check interrupted state and bail if we're supposed to shut down
           rescue => e
-            log "Error processing message:"
-            log e.message
-            log e.backtrace.join("\n")
+            puts e.message
+            puts e.backtrace.join("\n")
           end
         end
 
@@ -69,31 +70,7 @@ module OpenShift
         sleep([1, 3, 5].sample)
         result
       end
-
-      def log(msg)
-        log_file = "/var/log/oo-robo-#{@label}.log"
-        FileUtils.touch log_file unless File.exists?(log_file)
-
-        file = File.open(log_file, 'a')
-        begin
-          file.puts msg
-        ensure
-          file.close
-        end
-      end
     end
-  end
-end
-
-def log_crash(msg)
-  log_file = "/var/log/oo-robo-crash.log"
-  FileUtils.touch log_file unless File.exists?(log_file)
-
-  file = File.open(log_file, 'a')
-  begin
-    file.puts msg
-  ensure
-    file.close
   end
 end
 
@@ -124,9 +101,8 @@ opts = { hosts: [ { login: "mcollective", passcode: "marionette", host: '10.147.
 begin
   ::OpenShift::Runtime::UpgradeRobot.new(Stomp::Client.new(opts), request_queue, reply_queue, "robot-#{pid}").execute
 rescue => e
-  log_crash "Error processing message:"
-  log_crash e.message
-  log_crash e.backtrace.join("\n")
+  puts e.message
+  puts e.backtrace.join("\n")
 ensure
   FileUtils.rm_f(pid_file) if File.exist?(pid_file)
 end
