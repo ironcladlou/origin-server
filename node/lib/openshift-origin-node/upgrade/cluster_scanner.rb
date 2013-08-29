@@ -22,7 +22,7 @@ module OpenShift
                          app_name: "app#{gear_count}",
                          node: node,
                          login: "login#{gear_count}",
-                         active: [true, false].sample
+                         active: (rand(100) < 90)
                        }
             end
           end

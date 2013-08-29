@@ -66,7 +66,7 @@ module OpenShift
         def queue_upgrade
           self.num_attempts += 1
 
-          puts "queueing upgrade for #{self.uuid} [#{self.active ? 'active' : 'inactive'}] (attempt #{self.num_attempts} of #{self.max_attempts})"
+          puts "Queueing upgrade for #{self.uuid} [#{self.active ? 'active' : 'inactive'}] (attempt #{self.num_attempts} of #{self.max_attempts})"
           
           msg = {
             uuid: self.uuid,
@@ -137,7 +137,7 @@ module OpenShift
               if gear
                 result = UpgradeResult.new(gear_upgrader_result: remote_result['gear_upgrader_result'])
                 gear.complete_upgrade(result)
-                puts "Processed reply for gear #{gear_uuid}"
+                puts "Processed reply for gear #{gear_uuid} (state: #{gear.state})"
               else
                 puts "Dropping result for missing gear #{gear_uuid}"
               end
@@ -149,14 +149,11 @@ module OpenShift
             end
           end
 
-          print "Waiting for gear replies..."
+          puts "Waiting for gear replies..."
           while num_remaining > 0
             num_remaining = GearMachine.where(upgrade_execution_id: execution.id, :state.in => [:new, :upgrading]).count
             
             sleep 1
-
-            print "."
-            $stdout.flush
           end
 
           print "Done."
