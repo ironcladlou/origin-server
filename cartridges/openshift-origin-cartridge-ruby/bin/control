@@ -58,10 +58,15 @@ function pre-repo-archive() {
 
   # If the previous and current commits didn't upload .bundle and you have .bundle and vendor/bundle already deployed then store away for redeploy
   # Also adding .openshift/markers/force_clean_build at the root of the repo will trigger a clean rebundle
+  local branch="master"
+  if [ -n "$OPENSHIFT_DEPLOYMENT_BRANCH"]; then
+    branch="$OPENSHIFT_DEPLOYMENT_BRANCH"
+  fi
+
   pushd "${OPENSHIFT_HOMEDIR}/git/${OPENSHIFT_APP_NAME}.git" 1>/dev/null
-    if ! git show master:.openshift/markers/force_clean_build > /dev/null 2>&1 \
-      && ! git show master:.bundle > /dev/null 2>&1                            \
-      && ! git show master~1:.bundle > /dev/null 2>&1                          \
+    if ! git show ${branch}:.openshift/markers/force_clean_build > /dev/null 2>&1 \
+      && ! git show ${branch}:.bundle > /dev/null 2>&1                            \
+      && ! git show ${branch}~1:.bundle > /dev/null 2>&1                          \
       && [ -d ${OPENSHIFT_REPO_DIR}.bundle ]                                   \
       && [ -d ${OPENSHIFT_REPO_DIR}vendor/bundle ]
     then
