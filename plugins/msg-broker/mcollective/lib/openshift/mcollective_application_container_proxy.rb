@@ -1,7 +1,10 @@
 require 'mcollective'
 require 'open-uri'
 require 'timeout'
-
+require 'json'
+require 'stomp'
+require 'active_support/hash_with_indifferent_access'
+require 'active_support/core_ext/hash'
 include MCollective::RPC
 
 #
@@ -16,6 +19,16 @@ module OpenShift
     # to broker/node communications.
     #
     class MCollectiveApplicationContainerProxy < OpenShift::ApplicationContainerProxy
+      class StompClient
+        def self.instance
+          @@instance ||= create_instance
+        end
+
+        def self.create_instance
+          opts = { hosts: [ { login: "mcollective", passcode: "marionette", host: "localhost", port: 6163 } ] }
+          Stomp::Client.new(opts)
+        end
+      end
 
       # the "cartridge" for Node operation messages to "cartridge_do"
       @@C_CONTROLLER = 'openshift-origin-node'
@@ -2628,6 +2641,17 @@ module OpenShift
         puts message
       end
 
+      ROUTES = {
+        /app-create/ => :node,
+        /app-destroy/ => :node,
+        /.*frontend.*/ => :mcol,
+        /.*alias.*/ => :mcol,
+        /.*ssl.*/ => :mcol,
+        /.*quota.*/ => :mcol,
+        /cartridge-list/ => :mcol,
+        /.*district.*/ => :mcol,
+        /.*-action/ => :mcol
+      }
       #
       #
       # INPUTS:
@@ -2659,7 +2683,40 @@ module OpenShift
         result = nil
         begin
           Rails.logger.debug "DEBUG: rpc_client.custom_request('cartridge_do', #{mc_args.inspect}, #{@id}, {'identity' => #{@id}}) (Request ID: #{Thread.current[:user_action_log_uuid]})"
-          result = rpc_client.custom_request('cartridge_do', mc_args, @id, {'identity' => @id})
+          
+          route = :gear
+          ROUTES.each do |pattern, candidate_route|
+            if action =~ pattern
+              route = candidate_route
+              break
+            end
+          end
+
+          if [:node, :gear].include?(route)
+            result = nil
+            received_reply = false
+            if route == :node
+              request_queue = "/queue/mcollective.node.#{@id}.request"
+              reply_queue = "/queue/mcollective.node.#{@id}.reply"
+            else
+              gear_uuid = args['--with-container-uuid'].to_s
+              request_queue = "/queue/mcollective.gear.#{gear_uuid}.request"
+              reply_queue = "/queue/mcollective.gear.#{gear_uuid}.reply"
+            end
+            StompClient.instance.subscribe(reply_queue, {:ack => 'client', 'activemq.prefetchSize' => 1}) do |stomp_msg|
+              result = HashWithIndifferentAccess.new(JSON.load(stomp_msg.body))
+              Rails.logger.info("HACKDAY: AMQ msg: #{stomp_msg}")
+              Rails.logger.info("HACKDAY: AMQ body: #{stomp_msg.body}")
+              Rails.logger.info("HACKDAY: AMQ result hash: #{result}")
+              received_reply = true
+            end
+            StompClient.instance.publish(request_queue, JSON.dump(mc_args), {:persistent => true})
+            while !received_reply
+              sleep 1
+            end
+          else
+            result = rpc_client.custom_request('cartridge_do', mc_args, @id, {'identity' => @id})
+          end
           Rails.logger.debug "DEBUG: #{mask_user_creds(result.inspect)} (Request ID: #{Thread.current[:user_action_log_uuid]})" if log_debug_output
         rescue => e
           Rails.logger.error("Error processing custom_request for action #{action}: #{e.message}")
@@ -2693,6 +2750,17 @@ module OpenShift
       def parse_result(mcoll_reply, gear=nil, command=nil)
         app = gear.application unless gear.nil?
         result = ResultIO.new
+
+        if mcoll_reply.respond_to?(:has_key?)
+          Rails.logger.info("HACKDAY: Processing reply as an AMQ response")
+          gear_id = gear.nil? ? nil : gear.uuid
+          result.exitcode = mcoll_reply["exitcode"]
+          result.parse_output(mcoll_reply["output"], gear_id)
+          #if mcoll_result[:addtl_params]
+          #  result.deployments = mcoll_result[:addtl_params][:deployments]
+          #end
+          return result
+        end
 
         mcoll_result = mcoll_reply ? mcoll_reply[0] : nil
         output = nil
@@ -3493,6 +3561,16 @@ module OpenShift
           start_time = Time.new
           begin
             mc_args = handle.clone
+            Rails.logger.info("HACKDAY: parallel mc_args=#{mc_args}")
+
+            mc_args.each do |k, v|
+              next if k == :args
+              v.each do |data|
+                execute_direct(data[:job][:cartridge], data[:job][:action], data[:job][:args])
+              end
+            end
+
+            return
             options = MCollectiveApplicationContainerProxy.rpc_options.merge(handle.delete(:args) || {})
             rpc_client = MCollectiveApplicationContainerProxy.get_rpc_client('openshift', options)
             identities = handle.keys
@@ -3515,7 +3593,7 @@ module OpenShift
               end
             }
           ensure
-            rpc_client.disconnect
+            #rpc_client.disconnect
           end
           Rails.logger.debug "DEBUG: MCollective Response Time (execute_parallel): #{((Time.new - start_time)*1000).round}ms  (Request ID: #{Thread.current[:user_action_log_uuid]})"
         end
