@@ -30,7 +30,7 @@ function start() {
     write_httpd_passenv $HTTPD_PASSENV_FILE
     ensure_valid_httpd_process "$HTTPD_PID_FILE" "$HTTPD_CFG_FILE"
     update_passenger_performance
-    httpd_with_env start
+    ruby_context "RAILS_ENV=${RAILS_ENV:-production} nohup /usr/sbin/httpd $HTTPD_CMD_CONF -k start -D FOREGROUND &> >(/usr/bin/openshift-logger) &"
     [ "$?" == "0" ] && wait_for_pid_file $HTTPD_PID_FILE
 }
 

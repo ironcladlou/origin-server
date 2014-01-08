@@ -19,7 +19,8 @@ function start() {
     write_httpd_passenv $HTTPD_PASSENV_FILE
     oo-erb ${OPENSHIFT_PHP_DIR}conf/performance.conf.erb.hidden > $HTTPD_CFG_DIR/performance.conf
     ensure_valid_httpd_process "$HTTPD_PID_FILE" "$HTTPD_CFG_FILE"
-    php_context "/usr/sbin/httpd $HTTPD_CMD_CONF -k start" \
+    #php_context "/usr/sbin/httpd $HTTPD_CMD_CONF -k start" \
+    php_context "nohup /usr/sbin/httpd $HTTPD_CMD_CONF -k start -D FOREGROUND &> >(/usr/bin/openshift-logger) &" \
       && wait_for_pid_file $HTTPD_PID_FILE
     return $?
 }
@@ -51,8 +52,10 @@ function stop() {
       # If we still have a PID file, then ensure_valid_httpd_process's call to
       # killall_httpds didn't happen.
       httpd_pid=`cat "$HTTPD_PID_FILE" 2> /dev/null`
-      php_context "/usr/sbin/httpd $HTTPD_CMD_CONF -k stop" \
-        && wait_for_stop $httpd_pid
+      kill -9 $httpd_pid
+      wait_for_stop $httpd_pid
+      #php_context "/usr/sbin/httpd $HTTPD_CMD_CONF -k stop" \
+      #  && wait_for_stop $httpd_pid
     fi
 }
 
