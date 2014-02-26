@@ -50,7 +50,8 @@ function ishttpup() {
         fi
         # if the process failed to start, error out immediately
         # rather than waiting for the timeout on the port being available.
-        if ! ps | grep -v grep | grep $PROCESS_ID > /dev/null; then
+        jbpid=$(cat $JBOSS_PID_FILE);
+        if ! ps | grep -v grep | grep $jbpid > /dev/null; then
           return 2
         fi
 
@@ -86,10 +87,9 @@ function start_app() {
         export CATALINA_BASE=$OPENSHIFT_JBOSSEWS_DIR
         export CATALINA_TMPDIR=${OPENSHIFT_JBOSSEWS_DIR}/tmp
 
-        ${OPENSHIFT_JBOSSEWS_DIR}/bin/tomcat start > ${OPENSHIFT_JBOSSEWS_DIR}/logs/jbossews.log 2>&1 &
-        PROCESS_ID=$!
+        ${OPENSHIFT_JBOSSEWS_DIR}/bin/tomcat start &> >(/usr/bin/logshifter -tag jbossews) &
+        echo $! > $JBOSS_PID_FILE
 
-        echo $PROCESS_ID > $JBOSS_PID_FILE
         rc=0
         ishttpup || rc=$?
         if [ $rc -eq 1 ]; then

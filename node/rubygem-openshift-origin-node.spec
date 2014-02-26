@@ -52,6 +52,7 @@ Requires:      lsof
 Requires:      mercurial
 Requires:      mod_ssl
 Requires:      openshift-origin-node-proxy
+Requires:      openshift-origin-logshifter
 Requires:      pam_openshift
 Requires:      python
 Requires:      quota

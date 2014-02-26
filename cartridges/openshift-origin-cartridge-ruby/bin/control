@@ -30,7 +30,7 @@ function start() {
     write_httpd_passenv $HTTPD_PASSENV_FILE
     ensure_valid_httpd_process "$HTTPD_PID_FILE" "$HTTPD_CFG_FILE"
     update_passenger_performance
-    httpd_with_env start
+    ruby_context "RAILS_ENV=${RAILS_ENV:-production} nohup /usr/sbin/httpd $HTTPD_CMD_CONF -D FOREGROUND |& /usr/bin/logshifter -tag ruby &"
     [ "$?" == "0" ] && wait_for_pid_file $HTTPD_PID_FILE
 }
 
@@ -45,7 +45,7 @@ function stop() {
     ensure_valid_httpd_process "$HTTPD_PID_FILE" "$HTTPD_CFG_FILE"
     if [ -f "$HTTPD_PID_FILE" ]; then
         httpd_pid=`cat "$HTTPD_PID_FILE" 2> /dev/null`
-        httpd_with_env stop
+        kill -WINCH $httpd_pid
         wait_for_stop $httpd_pid
     fi
 }
@@ -57,7 +57,8 @@ function restart() {
     oo-erb ${OPENSHIFT_RUBY_DIR}conf/performance.conf.erb.hidden > $HTTPD_CFG_DIR/performance.conf
     [ -d ${OPENSHIFT_REPO_DIR}/tmp ] && touch ${OPENSHIFT_REPO_DIR}/tmp/restart.txt
     ensure_httpd_restart_succeed "$HTTPD_PID_FILE" "$HTTPD_CFG_FILE"
-    httpd_with_env restart
+    httpd_pid=`cat "$HTTPD_PID_FILE" 2> /dev/null`
+    kill -HUP $httpd_pid
 }
 
 function status() {

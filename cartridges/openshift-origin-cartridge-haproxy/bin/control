@@ -58,11 +58,17 @@ function _start_haproxy_ctld_daemon() {
     haproxy_ctld_daemon start 2>&1
 }
 
+function _launch_haproxy_bg() {
+    [ -n "$1" ]  &&  zopts="-sf $1"
+    ping_server_gears
+    nohup /usr/sbin/haproxy -f $OPENSHIFT_HAPROXY_DIR/conf/haproxy.cfg ${zopts} &> >(/usr/bin/logshifter -tag haproxy) &
+    echo $! > $HAPROXY_PID
+}
+
 function _start_haproxy_service() {
     if ! isrunning
     then
-        ping_server_gears
-        /usr/sbin/haproxy -f $OPENSHIFT_HAPROXY_DIR/conf/haproxy.cfg > $OPENSHIFT_HAPROXY_LOG_DIR/haproxy.log 2>&1
+        _launch_haproxy_bg
         _start_haproxy_ctld_daemon
         wait_to_start
     else
@@ -108,16 +114,10 @@ function _restart_haproxy_service() {
     _start_haproxy_service
 }
 
-function _reload_haproxy_service() {
-    [ -n "$1" ]  &&  zopts="-sf $1"
-    ping_server_gears
-    /usr/sbin/haproxy -f $OPENSHIFT_HAPROXY_DIR/conf/haproxy.cfg ${zopts} > /dev/null 2>&1
-}
-
 function _reload_service() {
     [ -f $HAPROXY_PID ]  &&  zpid=$( /bin/cat "${HAPROXY_PID}" )
     i=0
-    while (! _reload_haproxy_service "$zpid" )  && [ $i -lt 60 ]; do
+    while (! _launch_haproxy_bg "$zpid" )  && [ $i -lt 60 ]; do
         sleep 2
         i=$(($i + 1))
         echo "`date`: Retrying HAProxy service reload - attempt #$((i+1)) ... "

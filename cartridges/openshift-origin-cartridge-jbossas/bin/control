@@ -174,7 +174,8 @@ function ishttpup() {
         fi
         # if the process failed to start, error out immediately
         # rather than waiting for the timeout on the port being available.
-        if ! ps | grep -v grep | grep $PROCESS_ID > /dev/null; then
+        jbpid=$(cat $JBOSSAS_PID_FILE);
+        if ! ps | grep -v grep | grep $jbpid > /dev/null; then
           return 2
         fi
 
@@ -302,10 +303,9 @@ function start() {
   # Check for running app
   if isrunning; then
       echo "Application is already running"
-  else    
-    ${JBOSSAS_BIN_DIR}/standalone.sh > ${OPENSHIFT_TMP_DIR}/${cartridge_type}.log 2>&1 &
-    PROCESS_ID=$!
-    echo "$PROCESS_ID" > ${JBOSSAS_PID_FILE}
+  else
+    ${JBOSSAS_BIN_DIR}/standalone.sh &> >(/usr/bin/logshifter -tag jbossas) &
+    echo $! > ${JBOSSAS_PID_FILE}
 
     rc=0
     ishttpup || rc=$?
