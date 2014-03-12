@@ -57,9 +57,9 @@ function status() {
 
 # Clean up any log files
 function tidy() {
-  client_message "Emptying log dir: $OPENSHIFT_PERL_LOG_DIR"
+  client_message "Emptying perl logs in dir: $OPENSHIFT_LOG_DIR"
   shopt -s dotglob
-  rm -rf $OPENSHIFT_PERL_LOG_DIR/*
+  rm -rf $OPENSHIFT_PERL_LOG_DIR/perl*
 }
 
 case "$1" in

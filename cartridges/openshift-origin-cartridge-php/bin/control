@@ -76,9 +76,9 @@ function status() {
 }
 
 function tidy() {
-    echo "Emptying log dir: $OPENSHIFT_PHP_LOG_DIR"
+    echo "Emptying php logs in dir: $OPENSHIFT_LOG_DIR"
     shopt -s dotglob
-    rm -rf $OPENSHIFT_PHP_LOG_DIR/* || :
+    rm -rf $OPENSHIFT_PHP_LOG_DIR/php* || :
 }
 
 function build() {

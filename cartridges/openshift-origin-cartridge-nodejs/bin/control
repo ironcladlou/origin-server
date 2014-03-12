@@ -260,9 +260,9 @@ function pre-repo-archive() {
 
 # Clean up any log files
 function tidy() {
-  client_message "Emptying log dir: $OPENSHIFT_NODEJS_LOG_DIR"
+  client_message "Emptying nodejs logs in dir: $OPENSHIFT_LOG_DIR"
   shopt -s dotglob
-  rm -rf $OPENSHIFT_NODEJS_LOG_DIR/*
+  rm -rf $OPENSHIFT_NODEJS_LOG_DIR/nodejs*
   rm -rf ${OPENSHIFT_NODEJS_DIR}tmp/*
 }
 
