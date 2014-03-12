@@ -351,9 +351,9 @@ function reload() {
 
 # Clean up any log files
 function tidy() {
-  client_message "Emptying log dir: $OPENSHIFT_JBOSSEAP_LOG_DIR"
+  client_message "Emptying jbosseap logs in dir: $OPENSHIFT_LOG_DIR"
   shopt -s dotglob
-  rm -rf $OPENSHIFT_JBOSSEAP_LOG_DIR/*
+  rm -rf $OPENSHIFT_LOG_DIR/jbosseap*
   rm -rf $OPENSHIFT_JBOSSEAP_DIR/standalone/tmp/* 
 }
 

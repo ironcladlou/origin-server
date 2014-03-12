@@ -72,9 +72,9 @@ function status() {
 
 # Clean up any log files
 function tidy() {
-  client_message "Emptying log dir: $OPENSHIFT_RUBY_LOG_DIR"
+  client_message "Emptying ruby logs in dir: $OPENSHIFT_LOG_DIR"
   shopt -s dotglob
-  rm -rf $OPENSHIFT_RUBY_LOG_DIR/*
+  rm -rf $OPENSHIFT_RUBY_LOG_DIR/ruby*
   rm -rf ${OPENSHIFT_RUBY_DIR}tmp/*
 }
 
@@ -182,7 +182,7 @@ function threaddump() {
       result=$(_threaddump $OPENSHIFT_GEAR_UUID)
       if [ "$result" = "" ]; then
           DATE=`date -u '+%Y%m%d'`
-          echo "The thread dump file will be available via: tail -f ${OPENSHIFT_RUBY_LOG_DIR}/error_log-$DATE-*"
+          echo "The thread dump file will be available via: tail -f ${OPENSHIFT_LOG_DIR}/ruby*"
       else
           echo " $result"
       fi
@@ -197,7 +197,7 @@ function threaddump() {
       client_result "Success"
       client_result ""
       # note bz 923405/921537 for why log file name is not more specific
-      client_result "The thread dump file will be available via: rhc tail ${OPENSHIFT_APP_NAME} -g ${OPENSHIFT_GEAR_UUID} -f ${OPENSHIFT_RUBY_LOG_DIR}/error_log-$DATE-* -o '-n 250'"
+      client_result "The thread dump file will be available via: rhc tail ${OPENSHIFT_APP_NAME} -g ${OPENSHIFT_GEAR_UUID} -f ${OPENSHIFT_LOG_DIR}/ruby* -o '-n 250'"
   else
       client_result " $result"
   fi
