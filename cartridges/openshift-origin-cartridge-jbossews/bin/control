@@ -135,7 +135,7 @@ function threaddump() {
 function tidy() {
   client_message "Emptying jbossews logs from dir: $OPENSHIFT_LOG_DIR"
   shopt -s dotglob
-  rm -rf $OPENSHIFT_LOG_DIR/jbossews*
+  rm -rf $OPENSHIFT_LOG_DIR/jbossews.log*
   rm -rf $OPENSHIFT_JBOSSEWS_DIR/tmp/*
 }
 

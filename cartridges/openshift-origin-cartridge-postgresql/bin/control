@@ -217,7 +217,7 @@ function reload {
 }
 
 function tidy {
-  truncate -s0 $OPENSHIFT_LOG_DIR/postgresql*
+  truncate -s0 $OPENSHIFT_LOG_DIR/postgresql.log*
   # PosgreSQL needs to be running in order to perform vacuuming
   #
   if ! _is_running; then

@@ -81,7 +81,7 @@ function status() {
 function tidy() {
   client_message "Emptying ruby logs in dir: $OPENSHIFT_LOG_DIR"
   shopt -s dotglob
-  rm -rf $OPENSHIFT_RUBY_LOG_DIR/ruby*
+  rm -rf $OPENSHIFT_LOG_DIR/ruby.log*
   rm -rf ${OPENSHIFT_RUBY_DIR}tmp/*
 }
 
