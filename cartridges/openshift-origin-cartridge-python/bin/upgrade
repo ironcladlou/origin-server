@@ -12,7 +12,7 @@ fi
 upgrade_script="${OPENSHIFT_PYTHON_DIR}usr/versions/${python_version}/bin/upgrade"
 
 if [ -e "$upgrade_script" ]; then
-    exec "$upgrade_script" "$@"
+    $upgrade_script "$@"
 fi
 
 # The LD_LIBRARY_PATH is now handled by the Node itself
