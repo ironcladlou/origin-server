@@ -41,8 +41,12 @@ function stop() {
 
 function restart() {
   echo "Restarting Perl cartridge"
-  httpd_pid=`cat "$HTTPD_PID_FILE" 2> /dev/null`
-  kill -HUP $httpd_pid
+  if [ -f "$HTTPD_PID_FILE" ]; then
+    httpd_pid=`cat "$HTTPD_PID_FILE" 2> /dev/null`
+    kill -HUP $httpd_pid
+  else
+    start
+  fi
 }
 
 # Is the packaged software really running?
