@@ -298,6 +298,11 @@ function update-cluster() {
 # main():
 #
 
+function tidy() {
+  client_message "Emptying haproxy logs in dir: $OPENSHIFT_LOG_DIR"
+  shopt -s dotglob
+  rm -rf $OPENSHIFT_LOG_DIR/haproxy.log*
+}
 
 if ! [ -f ${OPENSHIFT_HAPROXY_DIR}/conf/haproxy.cfg ]; then
   client_error "HAProxy required configuration file \"$(basename $f)\" not found."
