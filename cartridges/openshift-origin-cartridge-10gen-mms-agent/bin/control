@@ -45,7 +45,7 @@ function start() {
       sed -i "s/^mms_key\s*=.*/${new_mms_key_line}/g" ${OPENSHIFT_10GENMMSAGENT_DIR}/mms-agent/settings.py
       sed -i "s/^secret_key\s*=.*/${new_secret_key_line}/g" ${OPENSHIFT_10GENMMSAGENT_DIR}/mms-agent/settings.py
 
-      nohup python ${OPENSHIFT_10GENMMSAGENT_DIR}/mms-agent/${OPENSHIFT_GEAR_UUID}_agent.py > ${OPENSHIFT_10GENMMSAGENT_DIR}/logs/agent.log 2>&1 &
+      nohup python ${OPENSHIFT_10GENMMSAGENT_DIR}/mms-agent/${OPENSHIFT_GEAR_UUID}_agent.py |& /usr/bin/logshifter -tag 10gen-mms-agent &
       echo $! > ${OPENSHIFT_10GENMMSAGENT_DIR}/run/mms-agent.pid
     elif [ -d ${OPENSHIFT_MMS_BASE_DIR} ]
     then
@@ -93,6 +93,11 @@ function reload() {
     restart
 }
 
+function tidy() {
+  client_message "Emptying 10gen-mms-agent logs in dir: $OPENSHIFT_LOG_DIR"
+  shopt -s dotglob
+  rm -rf $OPENSHIFT_LOG_DIR/10gen-mms-agent.log*
+}
 
 case "$1" in
   start)      start ;;
@@ -100,5 +105,6 @@ case "$1" in
   restart)    restart ;;
   status)     status ;;
   reload)     reload ;;
+  tidy)      tidy ;;
   *)          exit 0
 esac
